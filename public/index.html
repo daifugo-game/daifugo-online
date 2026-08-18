@@ -192,6 +192,17 @@
   .conn-badge{font-size:.62rem;padding:2px 8px;border-radius:10px;}
   .conn-badge.online{background:rgba(80,180,120,.2);color:#8fd19e;}
   .conn-badge.offline{background:rgba(200,80,80,.2);color:#e08a8a;}
+.joker-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:500;padding:16px;box-sizing:border-box;}
+.joker-modal{background:#1e2430;border-radius:14px;padding:20px;max-width:420px;width:100%;max-height:80vh;overflow-y:auto;box-sizing:border-box;box-shadow:0 8px 30px rgba(0,0,0,.5);}
+.joker-modal-title{margin:0 0 14px;font-size:17px;color:#fff;text-align:center;}
+.joker-choice-list{display:flex;flex-direction:column;gap:10px;margin-bottom:14px;}
+.joker-choice-btn{width:100%;box-sizing:border-box;padding:14px 12px;font-size:15px;line-height:1.4;border-radius:10px;border:1px solid #4a5568;background:#2d3748;color:#fff;cursor:pointer;text-align:left;}
+.joker-choice-btn:active{background:#4a5568;}
+.joker-cancel-btn{width:100%;box-sizing:border-box;}
+@media (max-width:480px){
+  .joker-modal{padding:16px;}
+  .joker-choice-btn{font-size:14px;padding:13px 10px;}
+}
 </style>
 </head>
 <body>

@@ -3,7 +3,7 @@
 'use strict';
 
 /* ============================================================
-   ゲームエンジン本体
+   基本定義
    ============================================================ */
 const SUITS = ['♠', '♥', '♦', '♣'];
 const RANKS = ['3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A', '2'];
@@ -56,46 +56,133 @@ function nextActiveRaw(gs, i) {
   return j;
 }
 
-function tryBuildStraightWithJokers(realCards, jokerCount) {
-  if (realCards.length === 0) return null;
+/* ============================================================
+   JOKER: 階段窓の列挙、自動決定、組み合わせ
+   ============================================================ */
+function enumerateStraightWindows(realCards, jokerCount) {
+  if (realCards.length === 0) return [];
   const suit = realCards[0].suit;
   const realIdxs = [...new Set(realCards.map(c => RANKS.indexOf(c.rank)))].sort((a, b) => a - b);
-  if (realIdxs.length !== realCards.length) return null;
+  if (realIdxs.length !== realCards.length) return [];
   const total = realCards.length + jokerCount;
-  if (total < 3) return null;
+  if (total < 3) return [];
   const minReal = realIdxs[0], maxReal = realIdxs[realIdxs.length - 1];
   const lowerBound = Math.max(0, maxReal - total + 1);
   const upperBound = Math.min(minReal, RANKS.length - total);
-  if (upperBound < lowerBound) return null;
-  const start = upperBound, end = start + total - 1;
-  const straightRanks = [];
-  for (let i = start; i <= end; i++) straightRanks.push(RANKS[i]);
-  return { suit, straightRanks };
+  const results = [];
+  for (let start = lowerBound; start <= upperBound; start++) {
+    const end = start + total - 1;
+    const windowRanks = [];
+    for (let i = start; i <= end; i++) windowRanks.push(RANKS[i]);
+    const jokerRanks = windowRanks.filter(r => !realCards.some(c => c.rank === r));
+    results.push({ suit, straightRanks: windowRanks, jokerRanks });
+  }
+  return results;
+}
+function tryBuildStraightWithJokers(realCards, jokerCount) {
+  const windows = enumerateStraightWindows(realCards, jokerCount);
+  if (windows.length === 0) return null;
+  const w = windows[windows.length - 1];
+  return { suit: w.suit, straightRanks: w.straightRanks };
+}
+function kCombinations(arr, k) {
+  if (k === 0) return [[]];
+  if (arr.length < k) return [];
+  const [first, ...rest] = arr;
+  const withFirst = kCombinations(rest, k - 1).map(c => [first, ...c]);
+  const withoutFirst = kCombinations(rest, k);
+  return [...withFirst, ...withoutFirst];
 }
 
-function evaluateSelection(gs, playerIndex, cardIds) {
+/* ============================================================
+   JOKER assignment 検証(唯一の判定元。候補生成・実プレイどちらもここを通す)
+   ============================================================ */
+function validateJokerAssignment(selectedJokers, jokerAssignment) {
+  if (jokerAssignment === undefined || jokerAssignment === null) return { ok: true, provided: false };
+  if (!Array.isArray(jokerAssignment)) return { ok: false };
+  if (jokerAssignment.length === 0) return { ok: true, provided: false };
+  if (jokerAssignment.some(a => !a || typeof a !== 'object' || typeof a.id !== 'string' || typeof a.rank !== 'string' || (a.suit !== null && typeof a.suit !== 'string'))) return { ok: false };
+  const selectedIds = selectedJokers.map(j => j.id);
+  const assignIds = jokerAssignment.map(a => a.id);
+  if (assignIds.length !== selectedIds.length) return { ok: false };
+  if (new Set(assignIds).size !== assignIds.length) return { ok: false };
+  for (const id of assignIds) { if (!selectedIds.includes(id)) return { ok: false }; }
+  for (const id of selectedIds) { if (!assignIds.includes(id)) return { ok: false }; }
+  return { ok: true, provided: true };
+}
+function validateSetJokerSuits(jokerSuits, realCards) {
+  if (jokerSuits.some(s => !SUITS.includes(s))) return false;
+  if (jokerSuits.some(s => realCards.some(c => c.suit === s))) return false;
+  if (new Set(jokerSuits).size !== jokerSuits.length) return false;
+  return true;
+}
+function validateStraightJokerAssignment(jokerRanksChosen, jokerSuitsChosen, realCards, straightSuit) {
+  if (jokerRanksChosen.some(r => !RANKS.includes(r))) return false;
+  if (jokerSuitsChosen.some(s => s !== null && s !== undefined && !SUITS.includes(s))) return false;
+  if (jokerSuitsChosen.some(s => s !== null && s !== undefined && s !== straightSuit)) return false;
+  if (new Set(jokerRanksChosen).size !== jokerRanksChosen.length) return false;
+  if (jokerRanksChosen.some(r => realCards.some(c => c.rank === r))) return false;
+  return true;
+}
+
+/* ============================================================
+   合法性判定(唯一の判定元)。禁止上がりの内容による拒否はここでは行わない。
+   ============================================================ */
+function evaluateSelection(gs, playerIndex, cardIds, jokerAssignment) {
   const player = gs.players[playerIndex];
   const cards = player.hand.filter(c => cardIds.includes(c.id));
   if (cards.length === 0) return { ok: false };
   const jokers = cards.filter(c => c.rank === 'JOKER');
   const realCards = cards.filter(c => c.rank !== 'JOKER');
+  const jaCheck = validateJokerAssignment(jokers, jokerAssignment);
+  if (!jaCheck.ok) return { ok: false };
+  const jaProvided = jaCheck.provided;
   let type, rank, suitsUsed, straightRanks = null;
+  let effectiveJokerAssignment = null;
 
   if (realCards.length === 0) {
     type = 'set'; rank = 'JOKER'; suitsUsed = [];
+    if (jokers.length > 0) effectiveJokerAssignment = jokers.map(j => ({ id: j.id, rank: 'JOKER', suit: null }));
   } else {
     const realRanksArr = realCards.map(c => c.rank);
     const allSameRank = realRanksArr.every(r => r === realRanksArr[0]);
     if (allSameRank) {
       type = 'set'; rank = realRanksArr[0];
-      suitsUsed = [...new Set(realCards.map(c => c.suit))];
+      let jokerSuits;
+      if (jaProvided) {
+        jokerSuits = jokers.map(j => jokerAssignment.find(x => x.id === j.id).suit);
+        const jokerRanksForCheck = jokers.map(j => jokerAssignment.find(x => x.id === j.id).rank);
+        if (jokerRanksForCheck.some(r => r !== realRanksArr[0])) return { ok: false };
+        if (!validateSetJokerSuits(jokerSuits, realCards)) return { ok: false };
+      } else {
+        const usedSuits = realCards.map(c => c.suit);
+        const availableSuits = SUITS.filter(s => !usedSuits.includes(s));
+        jokerSuits = jokers.map((j, i) => availableSuits[i]);
+        if (jokerSuits.some(s => !s)) return { ok: false };
+      }
+      suitsUsed = [...new Set([...realCards.map(c => c.suit), ...jokerSuits])];
+      if (jokers.length > 0) effectiveJokerAssignment = jokers.map((j, i) => ({ id: j.id, rank: realRanksArr[0], suit: jokerSuits[i] }));
     } else {
       const suits = realCards.map(c => c.suit);
       if (!suits.every(s => s === suits[0])) return { ok: false };
-      const built = tryBuildStraightWithJokers(realCards, jokers.length);
-      if (!built) return { ok: false };
-      type = 'straight'; suitsUsed = [built.suit]; straightRanks = built.straightRanks;
+      let chosenSuit, chosenRanks, jokerRanksChosen;
+      if (jaProvided) {
+        jokerRanksChosen = jokers.map(j => jokerAssignment.find(x => x.id === j.id).rank);
+        const jokerSuitsChosen = jokers.map(j => jokerAssignment.find(x => x.id === j.id).suit);
+        if (!validateStraightJokerAssignment(jokerRanksChosen, jokerSuitsChosen, realCards, suits[0])) return { ok: false };
+        const allIdxs = [...realCards.map(c => RANKS.indexOf(c.rank)), ...jokerRanksChosen.map(r => RANKS.indexOf(r))].sort((a, b) => a - b);
+        for (let i = 1; i < allIdxs.length; i++) { if (allIdxs[i] !== allIdxs[i - 1] + 1) return { ok: false }; }
+        chosenSuit = suits[0];
+        chosenRanks = allIdxs.map(i => RANKS[i]);
+      } else {
+        const built = tryBuildStraightWithJokers(realCards, jokers.length);
+        if (!built) return { ok: false };
+        chosenSuit = built.suit; chosenRanks = built.straightRanks;
+        jokerRanksChosen = chosenRanks.filter(r => !realCards.some(c => c.rank === r));
+      }
+      type = 'straight'; suitsUsed = [chosenSuit]; straightRanks = chosenRanks;
       rank = straightRanks[straightRanks.length - 1];
+      if (jokers.length > 0) effectiveJokerAssignment = jokers.map((j, i) => ({ id: j.id, rank: jokerRanksChosen[i], suit: chosenSuit }));
     }
   }
   const count = cards.length;
@@ -117,43 +204,41 @@ function evaluateSelection(gs, playerIndex, cardIds) {
     }
   }
 
-  const wouldFinish = count === player.hand.length;
-  let isFoulFinish = false;
-  if (wouldFinish) {
-    const ranksInvolved = type === 'straight' ? straightRanks : [rank];
-    const containsEight = ranksInvolved.includes('8');
-    const containsJoker = cards.some(c => c.rank === 'JOKER');
-    const foulEligible = containsEight || containsJoker; // 8/JOKER: allowed only if forced, then treated as a foul-finish
-    const hardForbidden = ranksInvolved.includes('2') || (ranksInvolved.includes('3') && gs.revolutionCount % 2 === 1); // 2 / revolution-3: simply blocked, normal win if forced
-    const forbidden = foulEligible || hardForbidden;
-    if (forbidden) {
-      if (gs.field === null && gs._leadCheckDepth === 0 && !anyLegalLeadExists(gs, playerIndex)) {
-        // no other legal move exists to lead with — allow as a last resort so the game never soft-locks
-        isFoulFinish = foulEligible;
-      } else {
-        return { ok: false, reason: 'forbidden_finish' };
-      }
-    }
-  }
-  return { ok: true, type, rank, count, cards, suitsUsed, straightRanks, isSpade3Counter, isFoulFinish };
+  return { ok: true, type, rank, count, cards, suitsUsed, straightRanks, isSpade3Counter, effectiveJokerAssignment };
 }
-function anyLegalLeadExists(gs, idx) {
-  gs._leadCheckDepth = (gs._leadCheckDepth || 0) + 1;
-  const player = gs.players[idx];
-  const candidates = generateCandidates(player.hand);
-  const result = candidates.some(arr => evaluateSelection(gs, idx, arr.map(c => c.id)).ok);
-  gs._leadCheckDepth--;
-  return result;
+
+function evaluateFoulFinish(gs, v, handBeforePlay) {
+  const wouldFinish = v.count === handBeforePlay.length;
+  if (!wouldFinish) return { isFoul: false, reasons: [] };
+  if (v.isSpade3Counter) return { isFoul: false, reasons: [] };
+  const reasons = [];
+  const ranksInvolved = v.type === 'straight' ? v.straightRanks : [v.rank];
+  const containsJokerPhysical = v.cards.some(c => c.rank === 'JOKER');
+  if (containsJokerPhysical) reasons.push('joker_finish');
+  if (ranksInvolved.includes('8')) reasons.push('eight_finish');
+  const revActive = gs.revolutionCount % 2 === 1;
+  if (!revActive && ranksInvolved.includes('2')) reasons.push('normal_2_finish');
+  if (revActive && ranksInvolved.includes('3')) reasons.push('revolution_3_finish');
+  return { isFoul: reasons.length > 0, reasons };
 }
-function describePlay(v) {
-  if (v.type === 'straight') return `${v.suitsUsed[0]}${v.straightRanks.join('-')}の階段`;
-  const label = v.rank === 'JOKER' ? 'JOKER' : v.rank;
-  return v.count === 1 ? label : `${label}×${v.count}`;
-}
+
+/* ============================================================
+   縛り・激縛りチェーン
+   ============================================================ */
 function updateSuitChain(gs, v, reversedAtValidation) {
   let track = null;
   if (v.type === 'straight') track = { kind: 'straight', suits: [v.suitsUsed[0]], rank: v.rank, count: v.count };
   else if (v.type === 'set' && v.suitsUsed.length > 0) track = { kind: 'set', suits: v.suitsUsed.slice().sort(), rank: v.rank, count: v.count };
+
+  const isPureJokerSingle = v.type === 'set' && v.rank === 'JOKER' && v.count === 1;
+  if (isPureJokerSingle && gs.lockSeq) {
+    gs.lockSeq = { suits: ['♠'], rank: '3', count: 1 };
+    gs.lockSuits = ['♠'];
+    gs.log += '(JOKERで激縛りを継続!次は♠3のみ)';
+    gs.prevTrack = null;
+    return;
+  }
+
   if (track && gs.prevTrack && gs.prevTrack.kind === track.kind && gs.prevTrack.count === track.count &&
     gs.prevTrack.suits.join('') === track.suits.join('')) {
     const sequential = track.kind === 'set' &&
@@ -183,7 +268,6 @@ function clearFieldStateKeepScore(gs) {
 function advance(gs, fromIndex, { tobiSteps = 1 } = {}) {
   let i = fromIndex;
   for (let s = 0; s < tobiSteps; s++) i = nextActiveRaw(gs, i);
-  const rawLanding = i;
   const owner = gs.fieldOwner;
   while (i !== owner && gs.passedThisField.has(i)) i = nextActiveRaw(gs, i);
   if (i === owner) {
@@ -218,6 +302,8 @@ function calculateRoundScore(gs) {
   gs.players[winnerIdx].score += points;
   gs.lastRoundPoints = points;
 }
+
+const FOUL_FIXED_POINTS = 1000;
 function commitFoulLoss(gs, actorIndex, reasonText, foulCardCount) {
   gs.effectQueue = [];
   gs.pendingAfterQueue = null;
@@ -230,28 +316,31 @@ function commitFoulLoss(gs, actorIndex, reasonText, foulCardCount) {
   gs.players[actorIndex].finished = true;
   gs.finishOrder.push(actorIndex);
 
-  const multiplier = Math.pow(2, gs.revolutionCount);
-  const points = foulCardCount * 100 * multiplier * 2;
+  const points = FOUL_FIXED_POINTS;
   const winnerIdx = gs.finishOrder[0];
   gs.players[actorIndex].score -= points;
   gs.players[winnerIdx].score += points;
   gs.lastRoundPoints = points;
-  gs.foulPenalty = { name: gs.players[actorIndex].name, amount: points, reason: reasonText, cardCount: foulCardCount, rate: multiplier };
-  gs.log = `⚠️ ${gs.players[actorIndex].name} が${reasonText}で反則上がり!(-${points}pt)`;
+  gs.foulPenalty = { name: gs.players[actorIndex].name, amount: points, reason: reasonText, cardCount: foulCardCount };
+  gs.log = `⚠️ ${gs.players[actorIndex].name} が${reasonText}で反則上がり!(-${points}pt固定)`;
   gs.phase = 'result';
 }
 
-function applyPlay(gs, playerIndex, cardIds) {
-  const v = evaluateSelection(gs, playerIndex, cardIds);
+/* ============================================================
+   プレイの適用
+   ============================================================ */
+function applyPlay(gs, playerIndex, cardIds, jokerAssignment) {
+  const v = evaluateSelection(gs, playerIndex, cardIds, jokerAssignment);
   if (!v.ok) return false;
   const player = gs.players[playerIndex];
+  const handBeforePlay = player.hand.slice();
   const reversedAtValidation = effectiveReversed(gs);
   player.hand = player.hand.filter(c => !cardIds.includes(c.id));
-  gs.field = { type: v.type, rank: v.rank, count: v.count, cards: v.cards, suitsUsed: v.suitsUsed };
+  gs.field = { type: v.type, rank: v.rank, count: v.count, cards: v.cards, suitsUsed: v.suitsUsed, jokerAssignment: v.effectiveJokerAssignment || null };
   gs.fieldOwner = playerIndex;
   gs.selected = [];
   gs.trickHistory.push({
-    type: v.type, rank: v.rank, count: v.count, cards: v.cards, suitsUsed: v.suitsUsed,
+    type: v.type, rank: v.rank, count: v.count, cards: v.cards, suitsUsed: v.suitsUsed, jokerAssignment: v.effectiveJokerAssignment || null,
     straightRanks: v.straightRanks, name: player.name, playerIndex, kind: 'play'
   });
 
@@ -286,18 +375,19 @@ function applyPlay(gs, playerIndex, cardIds) {
   updateSuitChain(gs, v, reversedAtValidation);
 
   const finishedNow = player.hand.length === 0;
-  const unfulfillableGiveDiscard = finishedNow && queue.length > 0;
-  if (unfulfillableGiveDiscard) {
-    gs.log = logMsg;
-    commitFoulLoss(gs, playerIndex, queue.map(q => q.type === 'give' ? '7渡し' : '10捨て').join('・'), v.count);
-    return true;
-  }
-  if (finishedNow && v.isFoulFinish) {
-    gs.log = logMsg;
-    commitFoulLoss(gs, playerIndex, '8またはJOKERを含む上がり', v.count);
-    return true;
-  }
   if (finishedNow) {
+    const contentFoul = evaluateFoulFinish(gs, v, handBeforePlay);
+    const unfulfillableGiveDiscard = queue.length > 0;
+    const foulReasons = [...contentFoul.reasons];
+    if (unfulfillableGiveDiscard) foulReasons.push(...queue.map(q => q.type === 'give' ? 'seven_unfulfilled' : 'ten_unfulfilled'));
+    if (foulReasons.length > 0) {
+      gs.log = logMsg;
+      const reasonText = foulReasons.includes('seven_unfulfilled') || foulReasons.includes('ten_unfulfilled')
+        ? queue.map(q => q.type === 'give' ? '7渡し' : '10捨て').join('・')
+        : '禁止上がり(' + foulReasons.join('・') + ')';
+      commitFoulLoss(gs, playerIndex, reasonText, v.count);
+      return true;
+    }
     player.finished = true; gs.finishOrder.push(playerIndex);
     logMsg += ` → ${player.name}が上がりました!`;
   }
@@ -320,6 +410,7 @@ function applyPlay(gs, playerIndex, cardIds) {
   processNextQueueItem(gs, playerIndex);
   return true;
 }
+
 function resolveTurnFlow(gs) {
   const paq = gs.pendingAfterQueue; gs.pendingAfterQueue = null;
   if (!paq) return;
@@ -337,7 +428,7 @@ function processNextQueueItem(gs, actorIndex) {
   }
   gs.pendingAction = item.type; gs.pendingCount = item.n; gs.pendingActor = actorIndex;
   gs.selected = [];
-  gs.phase = item.type; // 'give' | 'discard'
+  gs.phase = item.type;
 }
 function resolveGiveDiscardCore(gs, actorIndex, type, ids) {
   const player = gs.players[actorIndex];
@@ -383,14 +474,22 @@ function passTurn(gs, idx) {
   advance(gs, idx, { tobiSteps: 1 });
   return true;
 }
-function playCards(gs, idx, cardIds) {
+function playCards(gs, idx, cardIds, jokerAssignment) {
   if (gs.currentIndex !== idx) return { ok: false, error: 'not_your_turn' };
-  const v = evaluateSelection(gs, idx, cardIds);
+  const v = evaluateSelection(gs, idx, cardIds, jokerAssignment);
   if (!v.ok) return { ok: false, error: v.reason || 'invalid' };
-  applyPlay(gs, idx, cardIds);
+  applyPlay(gs, idx, cardIds, jokerAssignment);
   return { ok: true };
 }
+function describePlay(v) {
+  if (v.type === 'straight') return `${v.suitsUsed[0]}${v.straightRanks.join('-')}の階段`;
+  const label = v.rank === 'JOKER' ? 'JOKER' : v.rank;
+  return v.count === 1 ? label : `${label}×${v.count}`;
+}
 
+/* ============================================================
+   候補生成
+   ============================================================ */
 function generateCandidates(hand) {
   const candidates = [];
   const byRank = {};
@@ -401,9 +500,7 @@ function generateCandidates(hand) {
   Object.values(bySuit).forEach(cards => {
     const sorted = cards.slice().sort((a, b) => RANKS.indexOf(a.rank) - RANKS.indexOf(b.rank));
     let run = [sorted[0]];
-    const flush = (run) => {
-      if (run.length >= 3) { for (let len = 3; len <= run.length; len++) for (let start = 0; start + len <= run.length; start++) candidates.push(run.slice(start, start + len)); }
-    };
+    const flush = (run) => { if (run.length >= 3) { for (let len = 3; len <= run.length; len++) for (let start = 0; start + len <= run.length; start++) candidates.push(run.slice(start, start + len)); } };
     for (let i = 1; i < sorted.length; i++) {
       if (RANKS.indexOf(sorted[i].rank) === RANKS.indexOf(sorted[i - 1].rank) + 1) run.push(sorted[i]);
       else { flush(run); run = [sorted[i]]; }
@@ -413,6 +510,93 @@ function generateCandidates(hand) {
   return candidates;
 }
 
+/* ============================================================
+   JOKER代替候補: 責務ごとに分離
+   ============================================================ */
+function enumerateRawJokerCandidates(hand, cardIds) {
+  const cards = hand.filter(c => cardIds.includes(c.id));
+  const jokers = cards.filter(c => c.rank === 'JOKER');
+  const realCards = cards.filter(c => c.rank !== 'JOKER');
+  if (jokers.length === 0 || realCards.length === 0) return [];
+  const realRanksArr = realCards.map(c => c.rank);
+  const allSameRank = realRanksArr.every(r => r === realRanksArr[0]);
+  const raw = [];
+  if (allSameRank) {
+    const usedSuits = realCards.map(c => c.suit);
+    const availableSuits = SUITS.filter(s => !usedSuits.includes(s));
+    const combos = kCombinations(availableSuits, jokers.length);
+    combos.forEach(comboSuits => {
+      const assignment = jokers.map((j, i) => ({ id: j.id, suit: comboSuits[i], rank: realRanksArr[0] }));
+      raw.push({ type: 'set', assignment, previewSuitsUsed: [...new Set([...usedSuits, ...comboSuits])].sort(), previewRank: realRanksArr[0] });
+    });
+  } else {
+    const suits = realCards.map(c => c.suit);
+    if (!suits.every(s => s === suits[0])) return [];
+    const windows = enumerateStraightWindows(realCards, jokers.length);
+    windows.forEach(w => {
+      const assignment = jokers.map((j, i) => ({ id: j.id, suit: w.suit, rank: w.jokerRanks[i] }));
+      raw.push({ type: 'straight', assignment, previewSuitsUsed: [w.suit], previewRank: w.straightRanks[w.straightRanks.length - 1], previewStraightRanks: w.straightRanks });
+    });
+  }
+  return raw;
+}
+function candidateSignature(cand) {
+  if (cand.type === 'straight') return `straight:${cand.previewSuitsUsed[0]}:${cand.previewStraightRanks.join('-')}`;
+  return `set:${cand.previewRank}:${cand.previewSuitsUsed.slice().sort().join(',')}`;
+}
+function dedupeCandidates(rawList) {
+  const seen = new Set();
+  const out = [];
+  rawList.forEach(c => {
+    const sig = candidateSignature(c);
+    if (!seen.has(sig)) { seen.add(sig); out.push(c); }
+  });
+  return out;
+}
+function filterLegalCandidates(gs, playerIndex, cardIds, candidates) {
+  return candidates
+    .map(c => ({ ...c, evalResult: evaluateSelection(gs, playerIndex, cardIds, c.assignment) }))
+    .filter(c => c.evalResult.ok);
+}
+function labelForCandidate(cand) {
+  if (cand.type === 'straight') {
+    const jokerRanksLabel = cand.assignment.map(a => a.suit + a.rank).join('・');
+    return `JOKERを${jokerRanksLabel}として使う(完成形: ${cand.previewSuitsUsed[0]}${cand.previewStraightRanks.join('-')})`;
+  }
+  const jokerLabel = cand.assignment.map(a => a.suit + a.rank).join('・');
+  return `JOKERを${jokerLabel}として使う`;
+}
+function getJokerChoices(gs, playerIndex, cardIds) {
+  const player = gs.players[playerIndex];
+  const raw = enumerateRawJokerCandidates(player.hand, cardIds);
+  if (raw.length === 0) return null;
+  const deduped = dedupeCandidates(raw);
+  const legal = filterLegalCandidates(gs, playerIndex, cardIds, deduped);
+  if (legal.length <= 1) return null;
+  return legal.map(c => ({ label: labelForCandidate(c), assignment: c.assignment }));
+}
+function cpuChooseJokerAssignment(gs, playerIndex, cardIds) {
+  const player = gs.players[playerIndex];
+  const raw = dedupeCandidates(enumerateRawJokerCandidates(player.hand, cardIds));
+  const legal = filterLegalCandidates(gs, playerIndex, cardIds, raw);
+  if (legal.length === 0) return null;
+  const remainingAfterPlay = player.hand.filter(c => !cardIds.includes(c.id));
+  const suitCounts = {}; SUITS.forEach(s => suitCounts[s] = 0);
+  remainingAfterPlay.forEach(c => { if (c.suit) suitCounts[c.suit]++; });
+  let best = null, bestScore = Infinity;
+  legal.forEach(cand => {
+    const v = cand.evalResult;
+    let score = currentStrength(gs, v.rank);
+    const suitPenalty = cand.assignment.reduce((s, a) => s + (suitCounts[a.suit] || 0), 0);
+    score += suitPenalty * 0.01;
+    if (score < bestScore) { bestScore = score; best = cand; }
+  });
+  return best ? best.assignment : null;
+}
+
+/* ============================================================
+   ラウンド管理
+   ============================================================ */
 function rankLabels(n) {
   if (n <= 1) return ['大富豪'];
   if (n === 2) return ['大富豪', '大貧民'];
@@ -422,7 +606,6 @@ function rankLabels(n) {
   labels.push('貧民', '大貧民');
   return labels;
 }
-
 function dealRound(gs) {
   const deck = shuffle(buildDeck());
   const n = gs.players.length;
@@ -455,7 +638,7 @@ function createGameState(playersMeta) {
     finishOrder: [], selected: [], log: '',
     pendingAction: null, pendingCount: 0, pendingActor: null, effectQueue: [], pendingAfterQueue: null,
     lastRoundPoints: 0, trickHistory: [], foulPenalty: null,
-    _leadCheckDepth: 0, pendingFoulPlayCount: 0,
+    pendingFoulPlayCount: 0,
   };
   dealRound(gs);
   return gs;
@@ -463,6 +646,7 @@ function createGameState(playersMeta) {
 
 module.exports = {
   buildDeck, shuffle, sortHand, isRed, RANKS, SUITS,
-  evaluateSelection, describePlay, playCards, passTurn, confirmGiveDiscard,
+  evaluateSelection, evaluateFoulFinish, describePlay, playCards, passTurn, confirmGiveDiscard,
   dealRound, createGameState, rankLabels, calculateRoundScore,
+  getJokerChoices, cpuChooseJokerAssignment, generateCandidates,
 };

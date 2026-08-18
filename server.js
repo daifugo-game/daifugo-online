@@ -163,6 +163,25 @@ const server = http.createServer(async (req, res) => {
     return sendJson(res, 200, serializeForPlayer(room, playerId));
   }
 
+  if (url.pathname === '/api/jokerChoices' && req.method === 'POST') {
+    try {
+      const { roomCode, playerId, token, cardIds } = await readBody(req);
+      const room = rooms[(roomCode || '').toUpperCase()];
+      if (!room) return sendJson(res, 404, { error: 'no_room' });
+      const player = findPlayer(room, playerId, token);
+      if (!player) return sendJson(res, 403, { error: 'bad_token' });
+      if (!room.gs) return sendJson(res, 400, { error: 'not_started' });
+      if (room.gs.currentIndex !== playerId) return sendJson(res, 400, { error: 'not_your_turn' });
+      const ids = Array.isArray(cardIds) ? cardIds.filter(x => typeof x === 'string') : [];
+      const hand = room.gs.players[playerId] ? room.gs.players[playerId].hand : [];
+      const ownsAll = ids.length > 0 && ids.every(id => hand.some(c => c.id === id));
+      if (!ownsAll) return sendJson(res, 200, { choices: [] });
+      // 読み取り専用: engine.getJokerChoices のみを使用し、状態は一切変更しない
+      const choices = engine.getJokerChoices(room.gs, playerId, ids) || [];
+      return sendJson(res, 200, { choices });
+    } catch (e) { return sendJson(res, 400, { error: 'bad_request' }); }
+  }
+
   if (url.pathname === '/api/action' && req.method === 'POST') {
     try {
       const body = await readBody(req);
@@ -207,7 +226,21 @@ function handleAction(room, playerId, action) {
 
   if (action.type === 'play') {
     if (gs.phase !== 'playing') return { error: 'not_playable_now' };
-    const r = engine.playCards(gs, playerId, action.cardIds || []);
+    const cardIds = Array.isArray(action.cardIds) ? action.cardIds.filter(x => typeof x === 'string') : [];
+    let jokerAssignment;
+    if (action.jokerAssignment !== undefined && action.jokerAssignment !== null) {
+      if (!Array.isArray(action.jokerAssignment)) return { error: 'invalid' };
+      const clean = [];
+      for (const a of action.jokerAssignment) {
+        if (!a || typeof a !== 'object') return { error: 'invalid' };
+        if (typeof a.id !== 'string' || typeof a.rank !== 'string') return { error: 'invalid' };
+        if (a.suit !== null && typeof a.suit !== 'string') return { error: 'invalid' };
+        clean.push({ id: a.id, rank: a.rank, suit: a.suit });
+      }
+      jokerAssignment = clean;
+    }
+    // engine.playCards(→evaluateSelection)が唯一の合法性判定の場。ここでJOKER判定を重複実装しない。
+    const r = engine.playCards(gs, playerId, cardIds, jokerAssignment);
     return r.ok ? { ok: true } : { error: r.error };
   }
   if (action.type === 'pass') {

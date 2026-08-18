@@ -13,6 +13,9 @@ const app = {
   selected: new Set(),
   busy: false,
   pollTimer: null,
+  pendingJokerChoices: null,   // [{label, assignment}] または null
+  pendingJokerCardIds: null,   // 選択確定待ちのcardIds
+  isChoosingJoker: false,
 };
 
 const params = new URLSearchParams(location.search);
@@ -28,6 +31,11 @@ async function apiGet(path){
   return r.json();
 }
 function actionUrl(){ return '/api/action'; }
+async function apiJokerChoices(cardIds){
+  if(!app.me) return [];
+  const res = await apiPost('/api/jokerChoices', {roomCode:app.me.roomCode, playerId:app.me.playerId, token:app.me.token, cardIds});
+  return (res && Array.isArray(res.choices)) ? res.choices : [];
+}
 async function sendAction(action){
   if(!app.me) return;
   app.busy = true; render();
@@ -56,6 +64,7 @@ async function poll(){
     else {
       app.server = st;
       app.screen = st.phase === 'lobby' ? 'lobby' : 'game';
+      clearPendingJokerChoiceIfInvalid(st);
     }
   }catch(e){ /* network hiccup, ignore and retry next tick */ }
   render();
@@ -151,7 +160,11 @@ function pileCluster(entry, idx, activeIdx){
   wrap.style.top=`calc(50% + ${baseY}px)`;
   wrap.style.transform=`translate(-50%,-50%) rotate(${baseRot}deg)`;
   wrap.style.zIndex=idx+1;
-  wrap.appendChild(el('div',{class:'pile-tag',text:entry.name}));
+  let tagText = entry.name;
+  if(entry.jokerAssignment && entry.jokerAssignment.length>0){
+    tagText += ' ('+entry.jokerAssignment.map(a => a.rank==='JOKER' ? 'JOKER' : `JOKER→${(a.suit||'')}${a.rank}`).join('・')+')';
+  }
+  wrap.appendChild(el('div',{class:'pile-tag',text:tagText}));
   const cardsWrap=el('div',{class:'pile-cards'});
   entry.cards.forEach(card=>{
     const c=el('div',{class:'pile-card'+(isRed(card.suit)?' red':'')+(card.rank==='JOKER'?' joker':'')});
@@ -163,9 +176,13 @@ function pileCluster(entry, idx, activeIdx){
   return wrap;
 }
 function describePlayLike(entry){
-  if(entry.type==='straight') return `${entry.suitsUsed[0]}${entry.straightRanks.join('-')}の階段`;
-  const label = entry.rank==='JOKER' ? 'JOKER' : entry.rank;
-  return entry.count===1 ? label : `${label}×${entry.count}`;
+  const base = entry.type==='straight' ? `${entry.suitsUsed[0]}${entry.straightRanks.join('-')}の階段` :
+    (entry.rank==='JOKER' ? 'JOKER' : entry.rank) + (entry.count===1 ? '' : `×${entry.count}`);
+  if(entry.jokerAssignment && entry.jokerAssignment.length>0){
+    const jokerLabel = entry.jokerAssignment.map(a => a.rank==='JOKER' ? 'JOKER' : `JOKER→${(a.suit||'')}${a.rank}`).join('・');
+    return `${base}(${jokerLabel})`;
+  }
+  return base;
 }
 function miniHandFan(count){
   const wrap=el('div',{class:'mini-fan'});
@@ -356,7 +373,7 @@ function renderGame(root){
       panel.appendChild(el('div',{class:'hint-line', text:hint}));
       const ar = el('div',{class:'action-row'});
       ar.appendChild(el('button',{class:'btn play', text:'出す', disabled:(app.selected.size===0||app.busy)?'disabled':null,
-        onclick: ()=>{ const ids=[...app.selected]; app.selected=new Set(); sendAction({type:'play', cardIds:ids}); }}));
+        onclick: ()=>{ handlePlayClick([...app.selected]); }}));
       ar.appendChild(el('button',{class:'btn pass', text:'パス', disabled:(st.field===null||app.busy)?'disabled':null,
         onclick: ()=>sendAction({type:'pass'})}));
       ar.appendChild(el('button',{class:'btn clear', text:'選択解除', onclick:()=>{ app.selected=new Set(); render(); }}));
@@ -369,6 +386,65 @@ function renderGame(root){
   root.appendChild(panel);
 }
 function toggleSelect(id){ if(app.selected.has(id)) app.selected.delete(id); else app.selected.add(id); render(); }
+
+async function handlePlayClick(ids){
+  const st = app.server;
+  const me = st.players[app.me.playerId];
+  const hasJoker = (me.hand||[]).some(c => ids.includes(c.id) && c.rank==='JOKER');
+  app.selected = new Set();
+  if(!hasJoker){
+    sendAction({type:'play', cardIds:ids});
+    return;
+  }
+  app.busy = true; render();
+  const choices = await apiJokerChoices(ids);
+  app.busy = false;
+  if(choices.length >= 2){
+    app.pendingJokerChoices = choices;
+    app.pendingJokerCardIds = ids;
+    app.isChoosingJoker = true;
+    render();
+  } else {
+    // 候補0/1件: UIを出さずengine側の自動選択に任せる
+    sendAction({type:'play', cardIds:ids});
+  }
+}
+function confirmJokerChoice(choice){
+  const ids = app.pendingJokerCardIds;
+  app.pendingJokerChoices = null; app.pendingJokerCardIds = null; app.isChoosingJoker = false;
+  sendAction({type:'play', cardIds:ids, jokerAssignment:choice.assignment});
+}
+function cancelJokerChoice(){
+  app.pendingJokerChoices = null; app.pendingJokerCardIds = null; app.isChoosingJoker = false;
+  render();
+}
+function clearPendingJokerChoiceIfInvalid(st){
+  if(!app.isChoosingJoker) return;
+  const myId = app.me ? app.me.playerId : null;
+  let invalid = false;
+  if(!st || myId===null) invalid = true;
+  else if(st.gamePhase !== 'playing') invalid = true;
+  else if(st.currentIndex !== myId) invalid = true;
+  else {
+    const me = st.players[myId];
+    const hand = (me && me.hand) || [];
+    if(!app.pendingJokerCardIds || !app.pendingJokerCardIds.every(id => hand.some(c=>c.id===id))) invalid = true;
+  }
+  if(invalid){ app.pendingJokerChoices = null; app.pendingJokerCardIds = null; app.isChoosingJoker = false; }
+}
+function renderJokerChoiceModal(root){
+  const overlay = el('div',{class:'joker-modal-overlay'});
+  const modal = el('div',{class:'joker-modal'});
+  modal.appendChild(el('h3',{class:'joker-modal-title', text:'JOKERを何として使いますか?'}));
+  const list = el('div',{class:'joker-choice-list'});
+  app.pendingJokerChoices.forEach(choice=>{
+    list.appendChild(el('button',{class:'joker-choice-btn', text:choice.label, onclick:()=>confirmJokerChoice(choice)}));
+  });
+  modal.appendChild(list);
+  modal.appendChild(el('button',{class:'btn pass joker-cancel-btn', text:'キャンセル(選び直す)', onclick:cancelJokerChoice}));
+  overlay.appendChild(modal);
+  root.appendChild(overlay);
+}
 
 function renderResult(root, st){
   const wrap = el('div',{class:'result-wrap'});
@@ -414,5 +490,6 @@ function render(){
   if(app.screen==='landing') renderLanding(root);
   else if(app.screen==='lobby') renderLobby(root);
   else renderGame(root);
+  if(app.isChoosingJoker && app.pendingJokerChoices) renderJokerChoiceModal(root);
 }
 render();
