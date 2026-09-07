@@ -76,6 +76,8 @@ function serializeForPlayer(room, viewerId) {
   base.finishOrder = gs.finishOrder;
   base.lastRoundPoints = gs.lastRoundPoints;
   base.foulPenalty = gs.foulPenalty;
+  base.foulRateMultiplier = gs.foulRateMultiplier;
+  base.pendingFoulPenalties = gs.pendingFoulPenalties;
   base.gamePhase = gs.phase; // 'playing' | 'give' | 'discard' | 'result'
   base.pendingAction = gs.pendingAction;
   base.pendingCount = gs.pendingCount;
@@ -84,6 +86,7 @@ function serializeForPlayer(room, viewerId) {
     name: p.name,
     score: p.score,
     finished: p.finished,
+    fouled: p.fouled,
     handCount: p.hand.length,
     hand: i === viewerId ? p.hand : undefined,
   }));
