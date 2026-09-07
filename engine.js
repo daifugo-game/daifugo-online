@@ -269,27 +269,41 @@ function advance(gs, fromIndex, { tobiSteps = 1 } = {}) {
   let i = fromIndex;
   for (let s = 0; s < tobiSteps; s++) i = nextActiveRaw(gs, i);
   const owner = gs.fieldOwner;
-  while (i !== owner && gs.passedThisField.has(i)) i = nextActiveRaw(gs, i);
-  if (i === owner) {
+  const ownerActive = owner !== null && owner !== undefined && !gs.players[owner].finished;
+  // 場の所有者以外に、まだこのトリックへ応答していないアクティブプレイヤーがいるか
+  // (所有者自身が上がり/反則で非アクティブになっていても正しく判定できる形にする)
+  const othersStillToAct = gs.players.some((p, idx) => !p.finished && idx !== owner && !gs.passedThisField.has(idx));
+  if (!othersStillToAct) {
     clearFieldStateKeepScore(gs);
-    gs.currentIndex = owner;
+    gs.currentIndex = ownerActive ? owner : i;
   } else {
+    while (i !== owner && gs.passedThisField.has(i)) i = nextActiveRaw(gs, i);
     gs.currentIndex = i;
   }
   gs.selected = [];
 }
 
-function checkGameEnd(gs) {
+function currentRate(gs) { return Math.pow(2, gs.revolutionCount) * gs.foulRateMultiplier; }
+
+// ラウンド終了判定: アクティブ(未上がり・未反則)なプレイヤーが1人以下になったら終了。
+// 反則者が出たこと自体はラウンド終了理由にならない(呼び出し元がこの関数を都度呼んで判定する)。
+function finalizeRoundIfEnded(gs) {
   const remaining = activePlayers(gs);
+  if (remaining.length > 1) return false;
   if (remaining.length === 1) {
-    const idx = gs.players.findIndex(p => !p.finished);
+    const idx = gs.players.indexOf(remaining[0]);
     gs.players[idx].finished = true;
     gs.finishOrder.push(idx);
-    calculateRoundScore(gs);
-    gs.phase = 'result';
-    return true;
   }
-  return false;
+  // 反則者は最下位側(finishOrderの末尾)へ。先に反則したプレイヤーほど下位になるよう、発生順を逆にして追加する。
+  gs.foulOrder.slice().reverse().forEach(idx => gs.finishOrder.push(idx));
+  if (gs.pendingFoulPenalties.length > 0) {
+    applyPendingFoulPenaltiesToWinner(gs);
+  } else {
+    calculateRoundScore(gs);
+  }
+  gs.phase = 'result';
+  return true;
 }
 function calculateRoundScore(gs) {
   const n = gs.players.length;
@@ -302,28 +316,33 @@ function calculateRoundScore(gs) {
   gs.players[winnerIdx].score += points;
   gs.lastRoundPoints = points;
 }
+// 反則者ごとに直前に減点した分と同額を、そのラウンドの最終的な勝者(finishOrder[0])へ合算して加算する。
+// pendingFoulPenaltiesはラウンド終了時に一度だけ消費され、二重精算はしない。
+function applyPendingFoulPenaltiesToWinner(gs) {
+  const winnerIdx = gs.finishOrder[0];
+  let total = 0;
+  gs.pendingFoulPenalties.forEach(p => { total += p.penaltyPoints; });
+  gs.players[winnerIdx].score += total;
+  gs.lastRoundPoints = total;
+}
 
-const FOUL_FIXED_POINTS = 1000;
-function commitFoulLoss(gs, actorIndex, reasonText, foulCardCount) {
+// 反則者を即座に脱落させ、その時点のレートを2倍にしたうえで反則Ptを減点する。
+// ラウンドは終了しない(finalizeRoundIfEndedがアクティブ人数を見て判断する)。戻り値: ラウンドが終了したか。
+function commitFoulPenalty(gs, actorIndex, reasonText, foulCardCountAtFoul) {
   gs.effectQueue = [];
   gs.pendingAfterQueue = null;
-  const remaining = gs.players.filter((p, i) => i !== actorIndex && !p.finished);
-  const rankedRemaining = remaining.slice().sort((a, b) => a.hand.length - b.hand.length);
-  rankedRemaining.forEach(p => {
-    const idx = gs.players.indexOf(p);
-    p.finished = true; gs.finishOrder.push(idx);
-  });
+  const rateBefore = currentRate(gs);
+  gs.foulRateMultiplier *= 2;
+  const rateAfter = currentRate(gs);
+  const penaltyPoints = foulCardCountAtFoul * 100 * rateAfter;
+  gs.players[actorIndex].score -= penaltyPoints;
   gs.players[actorIndex].finished = true;
-  gs.finishOrder.push(actorIndex);
-
-  const points = FOUL_FIXED_POINTS;
-  const winnerIdx = gs.finishOrder[0];
-  gs.players[actorIndex].score -= points;
-  gs.players[winnerIdx].score += points;
-  gs.lastRoundPoints = points;
-  gs.foulPenalty = { name: gs.players[actorIndex].name, amount: points, reason: reasonText, cardCount: foulCardCount };
-  gs.log = `⚠️ ${gs.players[actorIndex].name} が${reasonText}で反則上がり!(-${points}pt固定)`;
-  gs.phase = 'result';
+  gs.players[actorIndex].fouled = true;
+  gs.foulOrder.push(actorIndex);
+  gs.pendingFoulPenalties.push({ playerId: actorIndex, reason: reasonText, cardCountAtFoul: foulCardCountAtFoul, rateBefore, rateAfter, penaltyPoints });
+  gs.foulPenalty = { name: gs.players[actorIndex].name, amount: penaltyPoints, reason: reasonText, cardCount: foulCardCountAtFoul, rate: rateAfter };
+  gs.log = `⚠️ ${gs.players[actorIndex].name} が${reasonText}で反則!(-${penaltyPoints}pt, レート${rateAfter}倍) ラウンドは継続します`;
+  return finalizeRoundIfEnded(gs);
 }
 
 /* ============================================================
@@ -385,7 +404,8 @@ function applyPlay(gs, playerIndex, cardIds, jokerAssignment) {
       const reasonText = foulReasons.includes('seven_unfulfilled') || foulReasons.includes('ten_unfulfilled')
         ? queue.map(q => q.type === 'give' ? '7渡し' : '10捨て').join('・')
         : '禁止上がり(' + foulReasons.join('・') + ')';
-      commitFoulLoss(gs, playerIndex, reasonText, v.count);
+      const roundEnded = commitFoulPenalty(gs, playerIndex, reasonText, v.count);
+      if (!roundEnded) advance(gs, playerIndex, { tobiSteps: 1 }); // 反則者を除外して残りプレイヤーで続行
       return true;
     }
     player.finished = true; gs.finishOrder.push(playerIndex);
@@ -396,9 +416,8 @@ function applyPlay(gs, playerIndex, cardIds, jokerAssignment) {
   gs.pendingFoulPlayCount = v.count;
 
   if (finishedNow) {
-    if (checkGameEnd(gs)) return true;
-    clearFieldStateKeepScore(gs);
-    advance(gs, playerIndex, { tobiSteps: 1 });
+    if (finalizeRoundIfEnded(gs)) return true;
+    advance(gs, playerIndex, { tobiSteps: 1 }); // 上がったカードは場に残したまま、次のアクティブプレイヤーへ
     return true;
   }
 
@@ -423,7 +442,8 @@ function processNextQueueItem(gs, actorIndex) {
   const item = gs.effectQueue.shift();
   const player = gs.players[actorIndex];
   if (player.hand.length < item.n) {
-    commitFoulLoss(gs, actorIndex, item.type === 'give' ? '7渡し' : '10捨て', gs.pendingFoulPlayCount);
+    const roundEnded = commitFoulPenalty(gs, actorIndex, item.type === 'give' ? '7渡し' : '10捨て', gs.pendingFoulPlayCount);
+    if (!roundEnded) advance(gs, actorIndex, { tobiSteps: 1 });
     return;
   }
   gs.pendingAction = item.type; gs.pendingCount = item.n; gs.pendingActor = actorIndex;
@@ -445,12 +465,11 @@ function resolveGiveDiscardCore(gs, actorIndex, type, ids) {
   if (player.hand.length === 0 && !player.finished) {
     player.finished = true; gs.finishOrder.push(actorIndex);
     gs.log += ` → ${player.name}が上がりました!`;
-    if (checkGameEnd(gs)) return true;
+    if (finalizeRoundIfEnded(gs)) return true;
     gs.effectQueue = [];
     gs.pendingAfterQueue = null;
-    clearFieldStateKeepScore(gs);
     gs.phase = 'playing';
-    advance(gs, actorIndex, { tobiSteps: 1 });
+    advance(gs, actorIndex, { tobiSteps: 1 }); // 上がったカードは場に残したまま、次のアクティブプレイヤーへ
     return true;
   }
   gs.phase = 'playing';
@@ -609,7 +628,7 @@ function rankLabels(n) {
 function dealRound(gs) {
   const deck = shuffle(buildDeck());
   const n = gs.players.length;
-  gs.players.forEach(p => { p.hand = []; p.finished = false; });
+  gs.players.forEach(p => { p.hand = []; p.finished = false; p.fouled = false; });
   deck.forEach((c, i) => gs.players[i % n].hand.push(c));
   gs.players.forEach(p => p.hand = sortHand(p.hand));
   let starter = 0;
@@ -624,13 +643,16 @@ function dealRound(gs) {
   gs.log = `ダイヤの3を持つ ${gs.players[starter].name} から開始`;
   gs.pendingAction = null; gs.pendingCount = 0; gs.pendingActor = null; gs.effectQueue = []; gs.pendingAfterQueue = null;
   gs.foulPenalty = null;
+  gs.foulRateMultiplier = 1;
+  gs.pendingFoulPenalties = [];
+  gs.foulOrder = [];
   gs.phase = 'playing';
 }
 function createGameState(playersMeta) {
   const gs = {
     phase: 'playing',
     roundNumber: 1,
-    players: playersMeta.map(p => ({ name: p.name, hand: [], finished: false, score: 0 })),
+    players: playersMeta.map(p => ({ name: p.name, hand: [], finished: false, fouled: false, score: 0 })),
     currentIndex: 0, field: null, fieldOwner: null,
     lockSuits: null, lockSeq: null, prevTrack: null,
     passedThisField: new Set(),
@@ -639,6 +661,7 @@ function createGameState(playersMeta) {
     pendingAction: null, pendingCount: 0, pendingActor: null, effectQueue: [], pendingAfterQueue: null,
     lastRoundPoints: 0, trickHistory: [], foulPenalty: null,
     pendingFoulPlayCount: 0,
+    foulRateMultiplier: 1, pendingFoulPenalties: [], foulOrder: [],
   };
   dealRound(gs);
   return gs;
