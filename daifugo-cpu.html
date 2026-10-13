@@ -1,0 +1,1864 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>大富豪</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --felt:#1f4d3d; --felt-dark:#143126; --felt-line:rgba(255,255,255,0.08);
+    --cream:#faf6ec; --ink:#211c15; --red:#b23a3a; --gold:#c9a227; --gold-soft:#e8cf7a;
+    --muted:#a9b8ae; --muted-dim:#6f8377; --danger:#8c3535;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 50% -10%,#2a5c48 0%,var(--felt) 45%,var(--felt-dark) 100%);
+    font-family:'Zen Kaku Gothic New',sans-serif;color:var(--cream);display:flex;flex-direction:column;-webkit-tap-highlight-color:transparent;}
+  .display{font-family:'Shippori Mincho',serif;}
+  #app{flex:1;display:flex;flex-direction:column;min-height:100vh;}
+
+  /* setup */
+  .setup-wrap{flex:1;display:flex;align-items:center;justify-content:center;padding:24px;}
+  .setup-card{width:100%;max-width:460px;background:linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02));
+    border:1px solid var(--felt-line);border-radius:18px;padding:32px 28px 28px;box-shadow:0 20px 60px rgba(0,0,0,0.35);}
+  .brand{text-align:center;margin-bottom:6px;}
+  .brand .kanji{font-size:2.6rem;font-weight:800;letter-spacing:.08em;text-shadow:0 2px 0 rgba(0,0,0,.25);}
+  .brand .en{display:block;margin-top:2px;font-size:.72rem;letter-spacing:.35em;color:var(--gold-soft);text-transform:uppercase;}
+  .brand .suits{margin-top:10px;font-size:1.1rem;letter-spacing:.5em;color:var(--muted-dim);}
+  .setup-section{margin-top:26px;}
+  .setup-label{font-size:.78rem;color:var(--muted);margin-bottom:10px;letter-spacing:.05em;}
+  .count-row{display:flex;gap:8px;}
+  .count-btn{flex:1;padding:10px 0;border-radius:10px;border:1px solid var(--felt-line);background:rgba(255,255,255,.03);
+    color:var(--cream);font-size:1rem;cursor:pointer;font-weight:700;font-family:inherit;}
+  .count-btn.active{background:var(--gold);color:var(--felt-dark);border-color:var(--gold);}
+  .name-list{display:flex;flex-direction:column;gap:10px;margin-top:12px;}
+  .name-row{display:flex;align-items:center;gap:10px;}
+  .name-badge{width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.08);display:flex;align-items:center;
+    justify-content:center;font-size:.78rem;color:var(--gold-soft);flex-shrink:0;font-weight:700;}
+  .name-row input{flex:1;padding:9px 12px;border-radius:9px;border:1px solid var(--felt-line);background:rgba(0,0,0,.18);
+    color:var(--cream);font-size:.95rem;font-family:inherit;}
+  .start-btn{margin-top:26px;width:100%;padding:14px 0;border:none;border-radius:11px;
+    background:linear-gradient(180deg,var(--gold-soft),var(--gold));color:var(--felt-dark);font-weight:900;font-size:1.02rem;
+    letter-spacing:.06em;cursor:pointer;font-family:inherit;box-shadow:0 6px 18px rgba(201,162,39,.25);}
+  .rules-link{display:block;text-align:center;margin-top:14px;font-size:.78rem;color:var(--muted-dim);text-decoration:underline;
+    cursor:pointer;background:none;border:none;font-family:inherit;}
+  .lang-switch{display:flex;justify-content:center;gap:6px;margin-bottom:14px;}
+  .lang-btn{padding:5px 14px;font-size:.72rem;letter-spacing:.06em;border-radius:999px;border:1px solid var(--felt-line, rgba(255,255,255,.2));background:rgba(0,0,0,.15);color:var(--muted-dim);cursor:pointer;font-family:inherit;}
+  .lang-btn.active{background:var(--gold-soft);color:var(--felt-dark);border-color:var(--gold-soft);font-weight:700;}
+  .game-lang-switch{position:fixed;top:8px;right:8px;z-index:60;display:flex;gap:4px;}
+  .game-lang-switch .lang-btn{padding:4px 9px;font-size:.65rem;}
+
+  /* reveal / pass-device */
+  .reveal-wrap{flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;
+    background:repeating-linear-gradient(135deg,var(--felt-dark),var(--felt-dark) 14px,#17392d 14px,#17392d 28px);
+    padding:24px;text-align:center;}
+  .reveal-box{background:rgba(20,49,38,.85);border:1px solid var(--felt-line);border-radius:18px;padding:40px 32px;
+    box-shadow:0 20px 60px rgba(0,0,0,.4);max-width:400px;width:100%;}
+  .reveal-box .who{font-size:.85rem;color:var(--muted);letter-spacing:.1em;}
+  .reveal-box .name{font-size:2rem;font-weight:800;margin:10px 0 4px;color:var(--gold-soft);}
+  .reveal-box .hint{font-size:.82rem;color:var(--muted-dim);margin-bottom:26px;}
+  .reveal-btn{padding:13px 34px;border:none;border-radius:11px;background:linear-gradient(180deg,var(--gold-soft),var(--gold));
+    color:var(--felt-dark);font-weight:900;font-size:.98rem;cursor:pointer;font-family:inherit;}
+
+  /* topbar */
+  .topbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;
+    padding:8px 14px;border-bottom:1px solid var(--felt-line);background:rgba(0,0,0,.14);}
+  .topbar .title{font-size:.9rem;font-weight:700;letter-spacing:.06em;color:var(--gold-soft);}
+  .badge-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+  .badge{font-size:.68rem;padding:3px 9px;border-radius:20px;border:1px solid var(--muted-dim);color:var(--muted);}
+  .badge.on{background:var(--danger);border-color:var(--danger);color:#fff;}
+  .badge.gold{background:var(--gold);border-color:var(--gold);color:var(--felt-dark);font-weight:700;}
+  .top-rules-btn{background:none;border:1px solid var(--felt-line);color:var(--muted);font-size:.68rem;
+    padding:4px 10px;border-radius:20px;cursor:pointer;font-family:inherit;}
+
+  /* arena */
+  .arena{position:relative;flex:1;min-height:380px;max-height:58vh;padding:10px;}
+  .seat{position:absolute;display:flex;flex-direction:column;align-items:center;gap:4px;
+    background:rgba(255,255,255,.03);border:1px solid var(--felt-line);border-radius:14px;padding:9px 14px;min-width:88px;}
+  .seat.tl{top:10px;left:10px;} .seat.tr{top:10px;right:10px;} .seat.bl{bottom:10px;left:10px;} .seat.br{bottom:10px;right:10px;}
+  .seat.tc{top:10px;left:50%;transform:translateX(-50%);}
+  .seat.current{border-color:var(--gold);background:rgba(201,162,39,.15);}
+  .seat.done{opacity:.5;}
+  .face{width:36px;height:36px;border-radius:50%;background:linear-gradient(160deg,#3a6b56,#20402f);
+    display:flex;align-items:center;justify-content:center;font-size:1rem;font-weight:800;border:1px solid var(--felt-line);color:var(--gold-soft);}
+  .seat .sname{font-size:.76rem;font-weight:700;}
+  .seat .sscore{font-size:.66rem;color:var(--gold-soft);font-weight:700;}
+  .seat .srank{font-size:.64rem;color:var(--gold-soft);font-weight:700;}
+
+  .field-zone{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    width:min(78%,420px);height:190px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;}
+  .field-empty{color:var(--muted-dim);font-size:.82rem;letter-spacing:.08em;text-align:center;}
+  .lock-banner{background:var(--gold);color:var(--felt-dark);font-weight:800;font-size:.76rem;padding:6px 14px;
+    border-radius:10px;text-align:center;box-shadow:0 3px 10px rgba(0,0,0,.3);animation:lockPulse 1.5s ease-in-out infinite;}
+  @keyframes lockPulse{0%,100%{transform:scale(1);}50%{transform:scale(1.035);}}
+  .hint-panel{margin:8px 10px 0;padding:10px 14px;border-radius:12px;background:rgba(201,162,39,.1);
+    border:1px solid rgba(201,162,39,.35);}
+  .hint-panel-title{font-size:.72rem;font-weight:800;color:var(--gold-soft);margin-bottom:5px;letter-spacing:.05em;}
+  .hint-panel-line{font-size:.74rem;color:var(--cream);line-height:1.5;}
+  .hint-panel-line.strong{color:var(--gold-soft);font-weight:700;margin-top:3px;}
+  .field-cards{position:relative;width:100%;height:140px;}
+  .log-line{font-size:.74rem;color:var(--muted);text-align:center;max-width:360px;}
+
+  .pile-cluster{position:absolute;display:flex;flex-direction:column;align-items:center;}
+  .pile-cluster:not(.active){opacity:.68;}
+  .pile-tag{font-size:.58rem;color:var(--gold-soft);background:rgba(0,0,0,.4);padding:1px 6px;border-radius:8px;
+    margin-bottom:3px;white-space:nowrap;}
+  .pile-cards{display:flex;}
+  .pile-cluster.active .pile-cards{filter:drop-shadow(0 0 4px rgba(201,162,39,.7));}
+  .pile-card{width:40px;height:56px;border-radius:6px;background:var(--cream);border:1px solid rgba(0,0,0,.15);
+    box-shadow:0 3px 7px rgba(0,0,0,.3);display:flex;flex-direction:column;align-items:center;justify-content:center;
+    font-weight:700;color:var(--ink);margin-left:-13px;flex-shrink:0;}
+  .pile-card:first-child{margin-left:0;}
+  .pile-card.red{color:var(--red);} .pile-card.joker{color:var(--gold);}
+  .pile-card .r{font-size:.78rem;} .pile-card .s{font-size:.82rem;} .pile-card .rj{font-size:.52rem;text-align:center;}
+
+  .trick-log{display:flex;gap:5px;flex-wrap:wrap;justify-content:center;max-width:380px;}
+  .trick-chip{font-size:.62rem;padding:2px 8px;border-radius:10px;background:rgba(255,255,255,.06);
+    border:1px solid var(--felt-line);color:var(--muted);white-space:nowrap;}
+  .trick-chip.pass{color:var(--muted-dim);font-style:italic;}
+
+  .mini-fan{position:relative;height:32px;width:78px;}
+  .mini-back{position:absolute;width:19px;height:27px;border-radius:4px;top:0;
+    background:repeating-linear-gradient(135deg,#173a2c,#173a2c 4px,#1f4d3d 4px,#1f4d3d 8px);
+    border:1px solid var(--gold-soft);box-shadow:0 1px 3px rgba(0,0,0,.3);}
+  .mini-count-badge{position:absolute;right:-2px;bottom:-6px;background:var(--gold);color:var(--felt-dark);
+    font-size:.6rem;font-weight:800;padding:1px 5px;border-radius:8px;border:1px solid var(--felt-dark);}
+
+  .hand-panel{background:rgba(0,0,0,.18);border-top:1px solid var(--felt-line);padding:12px 12px 16px;}
+  .hand-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;padding:0 4px;}
+  .hand-head .htitle{font-size:.78rem;color:var(--muted);letter-spacing:.06em;}
+  .hand-head .hscore{font-size:.76rem;color:var(--gold-soft);font-weight:700;}
+  .hint-line{font-size:.72rem;color:var(--muted-dim);text-align:center;margin-bottom:6px;min-height:1.1em;}
+  .hand-row{display:flex;gap:7px;overflow-x:auto;padding:6px 4px 10px;}
+  .hand-row-fan{display:flex;padding:10px 4px 16px;overflow-x:auto;}
+  .card{flex-shrink:0;width:50px;height:70px;border-radius:8px;background:var(--cream);border:1px solid rgba(0,0,0,.15);
+    display:block;box-shadow:0 2px 4px rgba(0,0,0,.25);
+    font-weight:700;color:var(--ink);cursor:pointer;user-select:none;transition:transform .12s ease;font-family:inherit;
+    position:relative;touch-action:none;overflow:hidden;}
+  .card .corner{position:absolute;top:4px;left:4px;display:flex;flex-direction:column;align-items:center;line-height:1.05;}
+  .card .corner .r{font-size:.74rem;font-weight:800;} .card .corner .s{font-size:.8rem;margin-top:1px;}
+  .card .center-suit{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:1.6rem;opacity:.25;}
+  .card.red{color:var(--red);}
+  .card.joker{color:var(--gold);border-color:var(--gold);}
+  .card.selected{transform:translateY(-12px);box-shadow:0 8px 16px rgba(0,0,0,.35),0 0 0 2px var(--gold);z-index:40 !important;}
+  .card.dragging{opacity:.85;box-shadow:0 10px 20px rgba(0,0,0,.5);}
+  .action-row{display:flex;gap:10px;padding:0 4px;}
+  .btn{flex:1;padding:12px 0;border-radius:11px;border:none;font-weight:900;font-size:.92rem;cursor:pointer;
+    letter-spacing:.03em;font-family:inherit;}
+  .btn.play{background:linear-gradient(180deg,var(--gold-soft),var(--gold));color:var(--felt-dark);}
+  .btn.pass{background:rgba(255,255,255,.08);color:var(--cream);border:1px solid var(--felt-line);}
+  .btn.clear{background:rgba(255,255,255,.05);color:var(--muted);border:1px solid var(--felt-line);flex:0 0 auto;padding:12px 18px;}
+  .btn:disabled{opacity:.35;cursor:not-allowed;}
+
+  .result-wrap{flex:1;display:flex;align-items:center;justify-content:center;padding:24px;}
+  .result-card{max-width:460px;width:100%;background:rgba(20,49,38,.85);border:1px solid var(--felt-line);
+    border-radius:18px;padding:30px 26px;box-shadow:0 20px 60px rgba(0,0,0,.4);}
+  .result-card h2{text-align:center;font-family:'Shippori Mincho',serif;font-size:1.5rem;margin:0 0 6px;color:var(--gold-soft);}
+  .result-sub{text-align:center;font-size:.78rem;color:var(--muted);margin-bottom:20px;}
+  .rank-list{display:flex;flex-direction:column;gap:9px;}
+  .rank-row{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;background:rgba(255,255,255,.04);border:1px solid var(--felt-line);}
+  .rank-row .num{font-family:'Shippori Mincho',serif;font-size:1.1rem;color:var(--muted);width:20px;}
+  .rank-row .rname{flex:1;font-weight:700;font-size:.88rem;}
+  .rank-row .rtitle{font-size:.72rem;color:var(--gold-soft);font-weight:700;margin-right:8px;}
+  .rank-row .rpt{font-size:.82rem;font-weight:800;} .rank-row .rpt.pos{color:#8fd19e;} .rank-row .rpt.neg{color:#e08a8a;}
+  .rank-row .rtotal{font-size:.68rem;color:var(--muted-dim);}
+  .result-btns{display:flex;gap:10px;margin-top:22px;}
+
+  .modal-back{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:20px;z-index:50;}
+  .modal-box{max-width:460px;width:100%;max-height:82vh;overflow-y:auto;background:#1a3f31;border:1px solid var(--felt-line);border-radius:16px;padding:24px;}
+  .modal-box h3{font-family:'Shippori Mincho',serif;color:var(--gold-soft);margin-top:0;}
+  .modal-box h4{font-size:.85rem;color:var(--gold-soft);margin:16px 0 6px;}
+  .modal-box ul{padding-left:1.1em;font-size:.82rem;line-height:1.65;color:var(--cream);margin:6px 0;}
+  .modal-box .note{font-size:.74rem;color:var(--muted-dim);margin-top:14px;line-height:1.6;}
+  .joker-choice-list{display:flex;flex-direction:column;gap:10px;margin:14px 0;}
+  .joker-choice-btn{width:100%;box-sizing:border-box;padding:14px 12px;font-size:.85rem;line-height:1.4;border-radius:10px;border:1px solid var(--felt-line);background:#234d3c;color:var(--cream);cursor:pointer;text-align:left;}
+  .joker-choice-btn:active{background:#2d5f4a;}
+  .joker-cancel-btn{width:100%;box-sizing:border-box;margin-top:4px;}
+  @media (max-width:480px){
+    .joker-choice-modal{padding:16px;}
+    .joker-choice-btn{font-size:.8rem;padding:13px 10px;}
+  }
+  .modal-close{margin-top:16px;width:100%;padding:11px 0;border:none;border-radius:9px;background:rgba(255,255,255,.1);
+    color:var(--cream);font-weight:700;cursor:pointer;font-family:inherit;}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+const SUITS=['♠','♥','♦','♣'];
+const RANKS=['3','4','5','6','7','8','9','10','J','Q','K','A','2'];
+const EFFECT_RANKS=['5','6','7','8','10','J'];
+
+function buildDeck(){
+  const d=[];
+  SUITS.forEach(s=>RANKS.forEach(r=>d.push({suit:s,rank:r,id:s+r})));
+  d.push({suit:null,rank:'JOKER',id:'JOKER-A'});
+  d.push({suit:null,rank:'JOKER',id:'JOKER-B'});
+  return d;
+}
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function sortHand(hand){
+  return hand.slice().sort((a,b)=>{
+    const ai=a.rank==='JOKER'?999:RANKS.indexOf(a.rank);
+    const bi=b.rank==='JOKER'?999:RANKS.indexOf(b.rank);
+    if(ai!==bi) return ai-bi;
+    return SUITS.indexOf(a.suit||'')-SUITS.indexOf(b.suit||'');
+  });
+}
+function isRed(suit){return suit==='♥'||suit==='♦';}
+
+function loadLearnedStats(){
+  try{
+    const raw=localStorage.getItem('daifugo-ai-learn-stats-v1');
+    if(raw) return JSON.parse(raw);
+  }catch(e){}
+  return {leadSmall:0, leadBig:0, premiumHeld:0, premiumUsed:0};
+}
+function saveLearnedStats(){
+  try{ localStorage.setItem('daifugo-ai-learn-stats-v1', JSON.stringify(state.learnedStats)); }catch(e){}
+}
+function resetLearnedStats(){
+  state.learnedStats={leadSmall:0, leadBig:0, premiumHeld:0, premiumUsed:0};
+  saveLearnedStats();
+}
+function usesPremiumCheck(v){
+  const ranks=v.type==='straight'?v.straightRanks:[v.rank];
+  return ranks.includes('2') || v.rank==='JOKER' || v.cards.some(c=>c.rank==='JOKER');
+}
+function learnedBigLeadBias(){
+  const s=state.learnedStats; return (s.leadBig+1)/(s.leadSmall+s.leadBig+2);
+}
+function learnedPremiumAggression(){
+  const s=state.learnedStats; return (s.premiumUsed+1)/(s.premiumHeld+s.premiumUsed+2);
+}
+
+/* ---------- i18n ---------- */
+const I18N={
+  ja:{
+    brandKanji:'大富豪', brandEn:'Daifugo',
+    tabLocal:'友達と対戦', tabCpu:'CPUと対戦', tabPractice:'練習(ヒント付き)', opponentLabel:'対戦相手',
+    modeDescLocal:'同じ画面を回して交代でプレーします',
+    modeDescPractice:'CPU相手に、階段や革命の可能性・おすすめの一手を画面に表示しながらプレーします',
+    modeDescCpu:'あなた1人 + CPUと対戦します',
+    playerCountLabel:'人数', playerCountLabelCpu:'人数(あなた+CPU)', playerCountSuffix:'人', countSuffix:'枚',
+    nameLabel:'名前', nameLabelCpu:'あなたの名前',
+    namePlaceholderPlayer:i=>`プレイヤー${i}`, namePlaceholderYou:'あなた',
+    startGameBtn:'ゲームを始める',
+    learnedStatsWithData:n=>`CPUはこれまでの対戦(${n}回の判断)からあなたの出し方の傾向を学習しています`,
+    learnedStatsNoData:'CPUはこれから対戦するたびにあなたの出し方の傾向を学習します',
+    resetLearnedStatsBtn:'学習データをリセット', viewRulesBtn:'ルールを見る',
+    nextPlayerLabel:'次のプレイヤー', revealHint:'他の人は画面を見ないでください。準備ができたらタップして手札を確認します。', revealBtn:'手札を見る',
+    hintTitle:'🎓 ヒント',
+    straightCandidates:line=>`階段候補: ${line}`, jokerUses:n=>`(JOKER${n}枚使用)`,
+    revolutionPossibility:parts=>`革命の可能性: ${parts}`,
+    revSetPart:(rank,have,need)=>`${rank}が${have}枚(JOKER${need}枚で革命)`, revStraightPart:(suit,ranks)=>`${suit}${ranks}の階段で革命`,
+    strategyBehind:'他の人より手札が多いので、大きい手からどんどん減らして負けを回避しましょう。',
+    strategyAhead:'他の人より手札が少なく有利です。2やJOKERは温存し、危なそうな相手を止めにいきましょう。',
+    strategyLeading:'リード気味です。強いカードを温存しつつ、弱いカードから減らしましょう。',
+    strategyEarly:'まだ序盤です。まずは階段やペアなど、まとまった手から効率よく減らしましょう。',
+    recommendedMove:desc=>`おすすめの一手: ${desc}`,
+    roundTitle:n=>`大富豪 - ラウンド${n}`, rulesBtnShort:'ルール',
+    revolutionBadge:(n,mult)=>`革命×${n}(pt${mult}倍)`, tempReversedBadge:'一時反転中', reversedBadge:'強さ逆転中',
+    gekiBadge:(suits,rank)=>`激縛り:${suits}${rank}かJOKER`, lockBadge:suits=>`縛り:${suits}のみ`,
+    finishedLabel:'完了',
+    gekiBanner:(suits,rank,shape)=>`🔒 激縛り中:次は ${suits}${rank}${shape} か JOKER しか出せません`,
+    gekiShape:count=>count>1?`(${count}枚組)`:'',
+    lockBanner:suits=>`🔒 縛り中:次は ${suits} のカードしか出せません`,
+    fieldEmpty:'場は空です — 好きな組み合わせで出せます',
+    passChip:name=>`${name}: パス`,
+    giveLabel:'次のプレイヤーに渡すカードを選択', discardLabel:'捨てるカードを選択', selCount:(a,b)=>`(${a}/${b}枚)`, confirmBtn:'決定',
+    handTitleTurn:(name,n)=>`${name}の手札(${n}枚) — あなたの番です`, handTitle:(name,n)=>`${name}の手札(${n}枚)`,
+    cpuThinking:name=>`${name} が考え中…`,
+    foulWarning:'⚠️ この手を出すと反則上がりになります', canPlay:desc=>`✓ ${desc} は出せます`, cannotPlay:'✕ この組み合わせは出せません',
+    play:'出す', pass:'パス', clearSel:'選択解除', dragHint:'カードはドラッグして並び替えできます',
+    straightSuffix:'の階段',
+    resultTitle:n=>`ラウンド${n} 結果`,
+    foulTotalAdded:pt=>`反則Ptの合計 ${pt}pt が大富豪へ加算されました`,
+    pointsExchanged:pt=>`やり取りポイント: ${pt}pt`,
+    foulLine:(name,reason,amount,rate)=>`⚠️ ${name} が${reason}で反則(-${amount}pt, レート${rate}倍)`,
+    totalPt:n=>`累計${n}pt`, nextRoundQ:'次のラウンドに進みますか?', yesNextRound:'はい、次のラウンドへ', noEndHere:'いいえ、ここで終了',
+    jokerModalTitle:'JOKERを何として使いますか?', jokerCancel:'キャンセル(選び直す)', jokerAs:s=>`JOKER→${s}`,
+    rankLabels:{daifugo:'大富豪', fugo:'富豪', heimin:'平民', hinmin:'貧民', daihinmin:'大貧民'},
+    rulesTitle:'遊び方(実装ルール)',
+    rulesBasics:['最初に「友達と対戦(ローカル)」か「CPUと対戦」を選べます。友達対戦は同じ画面を回して、自分の番以外は見ないでください。',
+      '2〜5人でプレー可能。ダイヤの3を持つ人から開始。強さは 3<4<...<10<J<Q<K<A<2<JOKER の順。',
+      '前の人と同じ枚数・同じ種類(同数字 or 階段)をより強く出す。パスも可(場が空のときは不可)。',
+      '一度パスしたら、その場が流れるまで再度出せません。5飛びで飛ばされた場合は出せます。',
+      '全員が出せず場が流れたら、最後に出した人の番から再開します。'],
+    rulesEffectsTitle:'特殊効果(同数字プレイ、または階段に含まれる数字ごとに発動)',
+    rulesEffects:['5飛び:5の枚数×2人分ターンを進める(1枚なら次の人を飛ばす)。全員分ちょうど戻ると自分の番に。',
+      '6ロック:出した6と同じマークのみ、その場が流れるまで出せる。',
+      '7渡し:7の枚数分、手札を選んで次の人に渡す。',
+      '8切り:場を流して自分の番に戻る(何枚出しても効果は同じ)。',
+      '10捨て:10の枚数分、手札を選んで捨てられる(捨て札は誰にも渡らない)。',
+      'Jジャック:その場が流れるまで強さが逆転する。',
+      '革命:同じ数字4枚、または4枚以上の階段(ジョーカーを使って完成させた場合も含む)を出すと強さが逆転し、獲得ポイントが2倍に。革命状態のときにさらに4枚以上で返す(革命返し)と強さは元に戻りますが、ポイント倍率はさらに倍(4倍・8倍…)に積み上がります。ラウンドが終わるまで持続。',
+      'マーク縛り:単発カード・ペア・トリプル・階段のいずれでも、2連続で同じマークの組み合わせ(ペアなら同じ2マークの組)が出されたら、その場はそのマークの組み合わせでしか出せません。',
+      '激縛り:さらに2連続で数字も1段階だけ強くなる並びだった場合、次はその続きの1枚(・ペア・組)かJOKERしか出せません。革命中やJバックで強さが反転している間も同様に働き、反転後の強さで見た「次の1枚」が必要になります(例:♥10→♥J の直後は ♥10 か JOKER のみ。♥11→♥7→♥6 のように反転中に数字が下がりながら強くなっていく並びでも、次は♥5 か JOKER のみになります)。',
+      '階段(同マーク3枚以上の連番)も出せます。'],
+    rulesJokerTitle:'ジョーカー',
+    rulesJoker:['単騎(または2枚)で出すと最強。唯一、スペードの3にだけ負けます。',
+      'スペードの3でJOKERを撃破すると、8切りと同じようにその場で場が流れ、スペ3を出した人の番に戻ります。',
+      '他の手札と組み合わせて「どんな数字・階段の一部」としても使えます。例:クラブの4・6と手札にJOKERがあれば、クラブの4-5-6の階段として出せます(5をJOKERが代役)。有効な使い方が複数ある場合は、どのカードとして使うか自分で選べます。',
+      '純粋にJOKERだけで出す場合は、どんな縛り(マーク縛り・激縛り・6ロック)も無視して出せます。他の実カードと組み合わせて出す場合は、通常どおり縛りの条件に従う必要があります。',
+      'JOKERを他のカードと一緒に使用して上がった場合も、JOKERを含む上がりのため反則です。'],
+    rulesForbiddenTitle:'禁止上がり・反則上がり',
+    rulesForbidden:['通常時、最後の1手に2・8・JOKERのいずれかが1枚でも含まれる場合(単騎・ペア・複数枚出し・階段・JOKER補完のいずれも)は反則上がりです。',
+      '革命中は、2の代わりに3・8・JOKERのいずれかが含まれる場合が反則上がりです(革命中の2上がりは正常です)。',
+      '唯一の例外は、場の単体JOKERに対して♠3で打ち返して上がる場合です。この場合だけは正常な上がりになります。',
+      '7を含む最後の1手で、渡すべきカードが手札に残っていない場合、または10を含む最後の1手で、捨てるべきカードが残っていない場合も反則上がりです。',
+      '反則者はその時点で即座に脱落し、そのラウンドの最下位側になります。ただし、反則が発生してもラウンド自体は終了せず、残りのプレイヤーで続行します。'],
+    rulesScoreTitle:'得点',
+    rulesScore:['ラウンドの最後まで手札が残った人(大貧民)は「残り枚数×100×倍率」を失う。',
+      '一番最初に上がった人(大富豪)がその分をまるごと獲得。真ん中の順位は増減なし。',
+      '反則が発生すると、その時点のレートが2倍になります。反則者の失点は「反則直前の手札枚数 × 100 × 2倍後のレート」で計算されます。',
+      'そのラウンドの最終的な大富豪が決まった時点で、反則者が失ったPtと同額がまとめて加算されます。複数人が反則した場合は、それぞれの反則Ptが合算されます。',
+      'スコアはラウンドをまたいで積み重なります。'],
+    rulesAfterFinishTitle:'上がった後の場',
+    rulesAfterFinish:['プレイヤーが正常に上がっても、最後に出したカードは場に残ります。',
+      '残りのプレイヤーはそのカードを基準にプレイを続けます。',
+      '残っている全員がパスした場合に場が流れ、次のプレイヤーから新しい場が始まります。'],
+    rulesOtherTitle:'その他',
+    rulesOther:['自分の手札はドラッグ(スマホならタッチ)で自由に並び替えできます。',
+      '中央には「その場が流れるまで」に誰が何を出したかが積み重なって表示されます。場が流れると消えます。',
+      '縛り・激縛りが発動すると、場の上に何が出せるかを説明するバナーが表示されます。',
+      'CPUと対戦するときは、あなたの実際の出し方(大きい手を出しがちか、2やJOKERを温存しがちか等)を対戦のたびに学習し、CPU自身の判断に反映します。学習データは端末に保存され、設定画面からリセットできます。'],
+    rulesNote:'※ 階段の特殊効果は各ランクにつき1枚分として扱います(例: 5枚出しの5トビのような複数枚効果にはなりません)。',
+    closeRules:'閉じる',
+  },
+  en:{
+    brandKanji:'大富豪', brandEn:'Daifugo',
+    tabLocal:'Play with Friends', tabCpu:'Play vs CPU', tabPractice:'Practice (with hints)', opponentLabel:'Opponent',
+    modeDescLocal:'Pass the same screen around and take turns.',
+    modeDescPractice:'Play against CPUs with on-screen hints for straights, Revolution chances, and recommended moves.',
+    modeDescCpu:'You alone against the CPU players.',
+    playerCountLabel:'Players', playerCountLabelCpu:'Players (you + CPU)', playerCountSuffix:'', countSuffix:'',
+    nameLabel:'Names', nameLabelCpu:'Your name',
+    namePlaceholderPlayer:i=>`Player ${i}`, namePlaceholderYou:'You',
+    startGameBtn:'Start Game',
+    learnedStatsWithData:n=>`The CPU has learned your play style from ${n} past decisions.`,
+    learnedStatsNoData:'The CPU will learn your play style as you play more games.',
+    resetLearnedStatsBtn:'Reset Learning Data', viewRulesBtn:'View Rules',
+    nextPlayerLabel:'Next Player', revealHint:"Everyone else, please look away. Tap when you're ready to check your hand.", revealBtn:'Show My Hand',
+    hintTitle:'🎓 Hints',
+    straightCandidates:line=>`Straight options: ${line}`, jokerUses:n=>` (using ${n} Joker${n>1?'s':''})`,
+    revolutionPossibility:parts=>`Revolution chances: ${parts}`,
+    revSetPart:(rank,have,need)=>`${rank} x${have} (${need} Joker${need!==1?'s':''} for Revolution)`, revStraightPart:(suit,ranks)=>`${suit}${ranks} straight for Revolution`,
+    strategyBehind:"You're holding more cards than others — unload your big hands quickly to avoid finishing last.",
+    strategyAhead:"You're ahead with fewer cards than others. Hold onto your 2s and Jokers, and try to block anyone who looks dangerous.",
+    strategyLeading:"You're in a good position — keep your strong cards in reserve and lead with your weaker ones.",
+    strategyEarly:"It's still early. Start by clearing out efficient combos like straights and pairs.",
+    recommendedMove:desc=>`Recommended move: ${desc}`,
+    roundTitle:n=>`Daifugo - Round ${n}`, rulesBtnShort:'Rules',
+    revolutionBadge:(n,mult)=>`Revolution×${n} (${mult}× points)`, tempReversedBadge:'Temporarily Reversed', reversedBadge:'Strength Reversed',
+    gekiBadge:(suits,rank)=>`Strong Lock: ${suits}${rank} or JOKER`, lockBadge:suits=>`Suit Lock: ${suits} only`,
+    finishedLabel:'Done',
+    gekiBanner:(suits,rank,shape)=>`🔒 Strong Suit Lock: only ${suits}${rank}${shape} or JOKER can be played`,
+    gekiShape:count=>count>1?` (×${count})`:'',
+    lockBanner:suits=>`🔒 Suit Lock: only ${suits} cards can be played`,
+    fieldEmpty:'The table is empty — play any combination to lead',
+    passChip:name=>`${name}: Pass`,
+    giveLabel:'Choose cards to give to the next player', discardLabel:'Choose cards to discard', selCount:(a,b)=>`(${a}/${b})`, confirmBtn:'Confirm',
+    handTitleTurn:(name,n)=>`${name}'s hand (${n}) — Your turn`, handTitle:(name,n)=>`${name}'s hand (${n})`,
+    cpuThinking:name=>`${name} is thinking…`,
+    foulWarning:'⚠️ Playing this would be an illegal finish', canPlay:desc=>`✓ ${desc} can be played`, cannotPlay:"✕ That combination can't be played",
+    play:'Play', pass:'Pass', clearSel:'Clear Selection', dragHint:'Drag your cards to reorder them',
+    straightSuffix:' straight',
+    resultTitle:n=>`Round ${n} Results`,
+    foulTotalAdded:pt=>`A total of ${pt}pt from illegal finishes was added to the President`,
+    pointsExchanged:pt=>`Points exchanged: ${pt}pt`,
+    foulLine:(name,reason,amount,rate)=>`⚠️ ${name} committed an illegal finish (${reason}) — -${amount}pt (rate ×${rate})`,
+    totalPt:n=>`Total: ${n}pt`, nextRoundQ:'Proceed to the next round?', yesNextRound:'Yes, Next Round', noEndHere:'No, End Here',
+    jokerModalTitle:'What should the Joker represent?', jokerCancel:'Cancel (choose again)', jokerAs:s=>`JOKER→${s}`,
+    rankLabels:{daifugo:'President', fugo:'Vice President', heimin:'Citizen', hinmin:'Poor', daihinmin:'Beggar'},
+    rulesTitle:'How to Play (Implemented Rules)',
+    rulesBasics:["First choose 'Play with Friends (local)' or 'Play vs CPU'. In local mode, pass the same screen around and look away except on your own turn.",
+      'Play with 2-5 players. Whoever holds the 3 of Diamonds starts. Strength order: 3<4<...<10<J<Q<K<A<2<JOKER.',
+      'Play the same number of cards as the previous play, of a stronger value (same rank, or a stronger straight). You may pass (except when the table is empty).',
+      "Once you pass, you can't play again until the table clears. If you're skipped by a Five Skip, you can play again.",
+      'If everyone passes, the table clears and play resumes from whoever played last.'],
+    rulesEffectsTitle:'Special Effects (triggered by a same-rank play, or by each rank inside a straight)',
+    rulesEffects:['Five Skip: skips (number of 5s × 2) turns (a single 5 skips the next player). If it comes exactly back around to you, it becomes your turn.',
+      'Six Lock: only the same suit as the 6 you played can be used, until the table clears.',
+      'Seven Give: choose that many cards from your hand and give them to the next player.',
+      'Eight Cut: clears the table and returns to your turn (the effect is the same regardless of how many 8s).',
+      'Ten Discard: choose that many cards from your hand and discard them (discards go to no one).',
+      'Jack Back: reverses card strength until the table clears.',
+      "Revolution: playing four of the same rank, or a straight of four or more (including ones completed with a Joker), reverses card strength and doubles the round's points. Countering a Revolution while it's active (with another 4+ play) reverses strength back, but the point multiplier keeps stacking (×4, ×8...). Lasts until the round ends.",
+      'Suit Lock: if two plays in a row — single, pair, triple, or straight — use the same suit combination, the table becomes locked to that suit.',
+      "Strong Suit Lock: if those two consecutive plays also step up by exactly one rank, the next play must continue that sequence (single/pair/set) or be a Joker. This also applies during Revolution or Jack Back reversal, using whichever rank counts as 'next' under the current reversed strength (e.g. right after ♥10→♥J, only ♥10 or JOKER can follow; during a reversal where ranks count down while getting stronger, like ♥11→♥7→♥6, the next play must be ♥5 or JOKER).",
+      'Straights (3+ consecutive same-suit cards) can also be played.'],
+    rulesJokerTitle:'Joker',
+    rulesJoker:['A single Joker (or a pair) is the strongest play there is. Only the 3 of Spades can beat it.',
+      'Countering a Joker with the 3 of Spades clears the table immediately, just like Eight Cut, and returns to the turn of whoever played the 3 of Spades.',
+      "A Joker can combine with your other cards to represent any rank or part of a straight. Example: with a Club 4, a Club 6, and a Joker in hand, you can play a Club 4-5-6 straight (the Joker standing in for the 5). If there's more than one valid way to use it, you choose which card it represents.",
+      'Playing a Joker alone (or Jokers only) bypasses any lock (Suit Lock, Strong Suit Lock, Six Lock). Combining it with real cards still follows the normal lock conditions.',
+      'Finishing with a Joker is illegal even when the Joker is played together with other cards as part of a set or straight.'],
+    rulesForbiddenTitle:'Illegal Finishes',
+    rulesForbidden:['During normal play, finishing your hand with a 2, an 8, or a Joker — in any form (single, pair, multi-card set, straight, or as a Joker substitute) — is an illegal finish.',
+      'During a Revolution, a 3 takes the place of the 2 in that rule (an 8 or Joker finish is still illegal either way; finishing with a 2 during Revolution is fine).',
+      'The one exception: finishing by countering a single Joker on the table with the 3 of Spades. That is always a legal finish.',
+      "It is also an illegal finish if your final play contains a 7 but you have no cards left to give, or contains a 10 but you have no cards left to discard.",
+      'The offending player is eliminated immediately and placed near the bottom of that round\u2019s ranking. The round itself does not end — it continues with the remaining players.'],
+    rulesScoreTitle:'Scoring',
+    rulesScore:['Whoever is still holding cards when the round ends (the Beggar) loses: remaining cards × 100 × rate.',
+      "Whoever finished first (the President) gains that full amount. Ranks in between have no change.",
+      'When an illegal finish happens, the current rate doubles immediately. The offending player loses: number of cards held right before that play × 100 × the rate after doubling.',
+      "Once the round's eventual President is decided, they receive the same amount the offender(s) lost, combined if more than one player fouled.",
+      'Scores carry over across rounds.'],
+    rulesAfterFinishTitle:'The Table After a Finish',
+    rulesAfterFinish:['When a player finishes their hand normally, the last card(s) they played stay on the table.',
+      'The remaining players continue playing against that card.',
+      'Once everyone still in the round has passed, the table clears and a new play starts from the next player.'],
+    rulesOtherTitle:'Other',
+    rulesOther:['You can freely reorder your own hand by dragging (or touch, on mobile).',
+      "The center of the table shows a stack of what everyone has played until the table clears, then it's cleared away.",
+      'When a Suit Lock or Strong Suit Lock activates, a banner explains what can be played.',
+      "When playing against the CPU, it learns your actual play style each game (whether you tend to lead big, hold onto 2s/Jokers, etc.) and factors that into its own decisions. This learning data is stored on your device and can be reset from the setup screen."],
+    rulesNote:"* A straight's special effects count as one card's worth per rank (e.g. a 5-card straight through a 5 does not multiply the Five Skip effect).",
+    closeRules:'Close',
+  },
+};
+function loadLang(){
+  try{ const v=localStorage.getItem('daifugoLang'); if(v==='ja'||v==='en') return v; }catch(e){}
+  return 'ja';
+}
+function setLang(l){ state.lang=l; try{ localStorage.setItem('daifugoLang', l); }catch(e){} render(); }
+function t(key, ...args){
+  const dict=I18N[state.lang]||I18N.ja;
+  const v=dict[key];
+  if(typeof v==='function') return v(...args);
+  return v!==undefined ? v : (I18N.ja[key]!==undefined ? I18N.ja[key] : key);
+}
+
+const state={
+  lang:loadLang(),
+  screen:'setup', mode:'local', playerCount:4, names:['プレイヤー1','プレイヤー2','プレイヤー3','プレイヤー4','プレイヤー5'],
+  players:[], currentIndex:0, pendingIndex:0, continuedTurn:false,
+  field:null, fieldOwner:null,
+  lockSuits:null, lockSeq:null, prevTrack:null,
+  passedThisField:new Set(),
+  revolutionCount:0, tempReversed:false,
+  finishOrder:[], selected:new Set(), log:'',
+  pendingAction:null, pendingCount:0, pendingActor:null, effectQueue:[], pendingAfterQueue:null,
+  showRules:false, roundNumber:1, lastRoundPoints:0,
+  trickHistory:[],
+  learnedStats: loadLearnedStats(),
+  foulPenalty:null,
+  foulRateMultiplier:1,
+  pendingFoulPenalties:[],
+  foulOrder:[],
+  pendingFoulPlayCount:0,
+  pendingJokerChoices:null,
+  pendingJokerCardIds:null,
+};
+
+function effectiveReversed(){ return (state.revolutionCount%2===1)!==state.tempReversed; }
+function currentStrength(rank){
+  if(rank==='JOKER') return 999;
+  const idx=RANKS.indexOf(rank);
+  return effectiveReversed() ? (RANKS.length-1-idx) : idx;
+}
+function strengthWithReversal(rank,reversed){
+  if(rank==='JOKER') return 999;
+  const idx=RANKS.indexOf(rank);
+  return reversed ? (RANKS.length-1-idx) : idx;
+}
+function nextStrongerRank(rank){
+  const idx=RANKS.indexOf(rank);
+  if(effectiveReversed()) return idx>0 ? RANKS[idx-1] : null;
+  return idx<RANKS.length-1 ? RANKS[idx+1] : null;
+}
+function activePlayers(){return state.players.filter(p=>!p.finished);}
+function isSelfMode(){ return state.mode==='cpu' || state.mode==='practice'; }
+function nextActiveRaw(i){const n=state.players.length;let j=i;do{j=(j+1)%n;}while(state.players[j].finished);return j;}
+
+function startGame(){
+  const n=state.playerCount;
+  const players=[];
+  for(let i=0;i<n;i++){
+    if(state.mode==='cpu' || state.mode==='practice'){
+      players.push({name: i===0 ? ((state.names[0]||'').trim()||'あなた') : `CPU ${i}`, hand:[], finished:false, score:0, isCPU:i!==0});
+    } else {
+      players.push({name:(state.names[i]||'').trim()||`プレイヤー${i+1}`, hand:[], finished:false, score:0, isCPU:false});
+    }
+  }
+  state.players=players;
+  state.roundNumber=1;
+  dealRound();
+  goToRoundStart();
+  render();
+}
+function goToRoundStart(){
+  if(state.mode==='cpu' || state.mode==='practice'){ state.screen='play'; }
+  else { state.screen='reveal'; state.pendingIndex=state.currentIndex; state.continuedTurn=false; }
+}
+function dealRound(){
+  const deck=shuffle(buildDeck());
+  const n=state.players.length;
+  state.players.forEach(p=>{p.hand=[];p.finished=false;p.fouled=false;});
+  deck.forEach((c,i)=>state.players[i%n].hand.push(c));
+  state.players.forEach(p=>p.hand=sortHand(p.hand));
+  let starter=0;
+  state.players.forEach((p,i)=>{ if(p.hand.some(c=>c.suit==='♦'&&c.rank==='3')) starter=i; });
+  state.currentIndex=starter;
+  state.field=null; state.fieldOwner=null;
+  state.lockSuits=null; state.lockSeq=null; state.prevTrack=null;   state.passedThisField=new Set();
+  state.revolutionCount=0; state.tempReversed=false;
+  state.finishOrder=[]; state.selected=new Set();
+  state.trickHistory=[];
+  state.log=`ダイヤの3を持つ ${state.players[starter].name} から開始`;
+  state.pendingAction=null; state.pendingCount=0; state.pendingActor=null; state.effectQueue=[]; state.pendingAfterQueue=null;
+  state.foulPenalty=null;
+  state.foulRateMultiplier=1;
+  state.pendingFoulPenalties=[];
+  state.foulOrder=[];
+}
+function startNextRound(){ state.roundNumber++; dealRound(); goToRoundStart(); render(); }
+function resetGame(){ state.screen='setup'; render(); }
+
+function clearFieldStateKeepScore(){
+  state.field=null; state.fieldOwner=null;
+  state.lockSuits=null; state.lockSeq=null; state.prevTrack=null;   state.passedThisField=new Set();
+  state.tempReversed=false;
+  state.trickHistory=[];
+}
+
+/* ---------- joker-wild straight helper ---------- */
+function enumerateStraightWindows(realCards, jokerCount){
+  if(realCards.length===0) return [];
+  const suit=realCards[0].suit;
+  const realIdxs=[...new Set(realCards.map(c=>RANKS.indexOf(c.rank)))].sort((a,b)=>a-b);
+  if(realIdxs.length!==realCards.length) return [];
+  const total=realCards.length+jokerCount;
+  if(total<3) return [];
+  const minReal=realIdxs[0], maxReal=realIdxs[realIdxs.length-1];
+  const lowerBound=Math.max(0,maxReal-total+1);
+  const upperBound=Math.min(minReal,RANKS.length-total);
+  const results=[];
+  for(let start=lowerBound; start<=upperBound; start++){
+    const end=start+total-1;
+    const windowRanks=[]; for(let i=start;i<=end;i++) windowRanks.push(RANKS[i]);
+    const jokerRanks=windowRanks.filter(r=>!realCards.some(c=>c.rank===r));
+    results.push({suit, straightRanks:windowRanks, jokerRanks});
+  }
+  return results;
+}
+function tryBuildStraightWithJokers(realCards, jokerCount){
+  const windows=enumerateStraightWindows(realCards, jokerCount);
+  if(windows.length===0) return null;
+  const w=windows[windows.length-1];
+  return {suit:w.suit, straightRanks:w.straightRanks};
+}
+function kCombinations(arr,k){
+  if(k===0) return [[]];
+  if(arr.length<k) return [];
+  const [first,...rest]=arr;
+  const withFirst=kCombinations(rest,k-1).map(c=>[first,...c]);
+  const withoutFirst=kCombinations(rest,k);
+  return [...withFirst,...withoutFirst];
+}
+function validateJokerAssignment(selectedJokers, jokerAssignment){
+  if(jokerAssignment===undefined || jokerAssignment===null) return {ok:true, provided:false};
+  if(!Array.isArray(jokerAssignment)) return {ok:false};
+  if(jokerAssignment.length===0) return {ok:true, provided:false};
+  if(jokerAssignment.some(a=>!a || typeof a!=='object' || typeof a.id!=='string' || typeof a.rank!=='string' || (a.suit!==null && typeof a.suit!=='string'))) return {ok:false};
+  const selectedIds=selectedJokers.map(j=>j.id);
+  const assignIds=jokerAssignment.map(a=>a.id);
+  if(assignIds.length!==selectedIds.length) return {ok:false};
+  if(new Set(assignIds).size!==assignIds.length) return {ok:false};
+  for(const id of assignIds){ if(!selectedIds.includes(id)) return {ok:false}; }
+  for(const id of selectedIds){ if(!assignIds.includes(id)) return {ok:false}; }
+  return {ok:true, provided:true};
+}
+function validateSetJokerSuits(jokerSuits, realCards){
+  if(jokerSuits.some(s=>!SUITS.includes(s))) return false;
+  if(jokerSuits.some(s=>realCards.some(c=>c.suit===s))) return false;
+  if(new Set(jokerSuits).size!==jokerSuits.length) return false;
+  return true;
+}
+function validateStraightJokerAssignment(jokerRanksChosen, jokerSuitsChosen, realCards, straightSuit){
+  if(jokerRanksChosen.some(r=>!RANKS.includes(r))) return false;
+  if(jokerSuitsChosen.some(s=>s!==null && s!==undefined && !SUITS.includes(s))) return false;
+  if(jokerSuitsChosen.some(s=>s!==null && s!==undefined && s!==straightSuit)) return false;
+  if(new Set(jokerRanksChosen).size!==jokerRanksChosen.length) return false;
+  if(jokerRanksChosen.some(r=>realCards.some(c=>c.rank===r))) return false;
+  return true;
+}
+
+/* ---------- selection evaluation (pure, legality only) ---------- */
+function evaluateSelection(playerIndex, cardIds, jokerAssignment){
+  const player=state.players[playerIndex];
+  const cards=player.hand.filter(c=>cardIds.includes(c.id));
+  if(cards.length===0) return {ok:false};
+  const jokers=cards.filter(c=>c.rank==='JOKER');
+  const realCards=cards.filter(c=>c.rank!=='JOKER');
+  const jaCheck=validateJokerAssignment(jokers, jokerAssignment);
+  if(!jaCheck.ok) return {ok:false};
+  const jaProvided=jaCheck.provided;
+  let type,rank,suitsUsed,straightRanks=null;
+  let effectiveJokerAssignment=null;
+
+  if(realCards.length===0){
+    type='set'; rank='JOKER'; suitsUsed=[];
+    if(jokers.length>0) effectiveJokerAssignment=jokers.map(j=>({id:j.id, rank:'JOKER', suit:null}));
+  } else {
+    const realRanksArr=realCards.map(c=>c.rank);
+    const allSameRank=realRanksArr.every(r=>r===realRanksArr[0]);
+    if(allSameRank){
+      type='set'; rank=realRanksArr[0];
+      let jokerSuits;
+      if(jaProvided){
+        jokerSuits=jokers.map(j=>jokerAssignment.find(x=>x.id===j.id).suit);
+        const jokerRanksForCheck=jokers.map(j=>jokerAssignment.find(x=>x.id===j.id).rank);
+        if(jokerRanksForCheck.some(r=>r!==realRanksArr[0])) return {ok:false};
+        if(!validateSetJokerSuits(jokerSuits, realCards)) return {ok:false};
+      } else {
+        const usedSuits=realCards.map(c=>c.suit);
+        const availableSuits=SUITS.filter(s=>!usedSuits.includes(s));
+        jokerSuits=jokers.map((j,i)=>availableSuits[i]);
+        if(jokerSuits.some(s=>!s)) return {ok:false};
+      }
+      suitsUsed=[...new Set([...realCards.map(c=>c.suit), ...jokerSuits])];
+      if(jokers.length>0) effectiveJokerAssignment=jokers.map((j,i)=>({id:j.id, rank:realRanksArr[0], suit:jokerSuits[i]}));
+    } else {
+      const suits=realCards.map(c=>c.suit);
+      if(!suits.every(s=>s===suits[0])) return {ok:false};
+      let chosenSuit,chosenRanks,jokerRanksChosen;
+      if(jaProvided){
+        jokerRanksChosen=jokers.map(j=>jokerAssignment.find(x=>x.id===j.id).rank);
+        const jokerSuitsChosen=jokers.map(j=>jokerAssignment.find(x=>x.id===j.id).suit);
+        if(!validateStraightJokerAssignment(jokerRanksChosen, jokerSuitsChosen, realCards, suits[0])) return {ok:false};
+        const allIdxs=[...realCards.map(c=>RANKS.indexOf(c.rank)), ...jokerRanksChosen.map(r=>RANKS.indexOf(r))].sort((a,b)=>a-b);
+        for(let i=1;i<allIdxs.length;i++){ if(allIdxs[i]!==allIdxs[i-1]+1) return {ok:false}; }
+        chosenSuit=suits[0]; chosenRanks=allIdxs.map(i=>RANKS[i]);
+      } else {
+        const built=tryBuildStraightWithJokers(realCards, jokers.length);
+        if(!built) return {ok:false};
+        chosenSuit=built.suit; chosenRanks=built.straightRanks;
+        jokerRanksChosen=chosenRanks.filter(r=>!realCards.some(c=>c.rank===r));
+      }
+      type='straight'; suitsUsed=[chosenSuit]; straightRanks=chosenRanks;
+      rank=straightRanks[straightRanks.length-1];
+      if(jokers.length>0) effectiveJokerAssignment=jokers.map((j,i)=>({id:j.id, rank:jokerRanksChosen[i], suit:chosenSuit}));
+    }
+  }
+  const count=cards.length;
+  const isSpade3Counter=!!(state.field && state.field.count===1 && state.field.cards[0].rank==='JOKER'
+      && count===1 && cards[0].suit==='♠' && cards[0].rank==='3');
+  const isAllJoker = realCards.length===0;
+
+  if(!isSpade3Counter){
+    if(state.lockSeq){
+      const okJoker=isAllJoker;
+      if(!okJoker && !(count===state.lockSeq.count && rank===state.lockSeq.rank && cards.every(c=>c.suit && state.lockSeq.suits.includes(c.suit)))) return {ok:false};
+    } else if(state.lockSuits){
+      if(!isAllJoker && !cards.every(c=>c.suit ? state.lockSuits.includes(c.suit) : true)) return {ok:false};
+    }
+    if(state.field!==null){
+      if(state.field.type!==type) return {ok:false};
+      if(state.field.count!==count) return {ok:false};
+      if(currentStrength(rank)<=currentStrength(state.field.rank)) return {ok:false};
+    }
+  }
+
+  return {ok:true,type,rank,count,cards,suitsUsed,straightRanks,isSpade3Counter,effectiveJokerAssignment};
+}
+
+// 禁止上がり(反則上がり)判定。プレイの合法性(evaluateSelection)とは完全に分離する。
+function evaluateFoulFinish(v, handBeforePlay){
+  const wouldFinish = v.count===handBeforePlay.length;
+  if(!wouldFinish) return {isFoul:false, reasons:[]};
+  if(v.isSpade3Counter) return {isFoul:false, reasons:[]}; // 唯一の例外
+  const reasons=[];
+  const ranksInvolved = v.type==='straight' ? v.straightRanks : [v.rank];
+  const containsJokerPhysical = v.cards.some(c=>c.rank==='JOKER');
+  if(containsJokerPhysical) reasons.push('joker_finish');
+  if(ranksInvolved.includes('8')) reasons.push('eight_finish');
+  const revActive = state.revolutionCount%2===1;
+  if(!revActive && ranksInvolved.includes('2')) reasons.push('normal_2_finish');
+  if(revActive && ranksInvolved.includes('3')) reasons.push('revolution_3_finish');
+  return {isFoul: reasons.length>0, reasons};
+}
+function describePlay(v){
+  if(v.type==='straight') return `${v.suitsUsed[0]}${v.straightRanks.join('-')}${t('straightSuffix')}`;
+  const label=v.rank==='JOKER'?'JOKER':v.rank;
+  return v.count===1?label:`${label}×${v.count}`;
+}
+function updateSuitChain(v,reversedAtValidation){
+  let track=null;
+  if(v.type==='straight') track={kind:'straight', suits:[v.suitsUsed[0]], rank:v.rank, count:v.count};
+  else if(v.type==='set' && v.suitsUsed.length>0) track={kind:'set', suits:v.suitsUsed.slice().sort(), rank:v.rank, count:v.count};
+
+  const isPureJokerSingle = v.type==='set' && v.rank==='JOKER' && v.count===1;
+  if(isPureJokerSingle && state.lockSeq){
+    state.lockSeq={suits:['♠'], rank:'3', count:1};
+    state.lockSuits=['♠'];
+    state.log+='(JOKERで激縛りを継続!次は♠3のみ)';
+    state.prevTrack=null;
+    return;
+  }
+
+  if(track && state.prevTrack && state.prevTrack.kind===track.kind && state.prevTrack.count===track.count &&
+     state.prevTrack.suits.join('')===track.suits.join('')){
+    const sequential = track.kind==='set' &&
+        strengthWithReversal(track.rank,reversedAtValidation)===strengthWithReversal(state.prevTrack.rank,reversedAtValidation)+1;
+    const suitLabel=track.suits.join('');
+    if(sequential){
+      const nextRank=nextStrongerRank(track.rank);
+      if(nextRank){
+        state.lockSeq={suits:track.suits, rank:nextRank, count:track.count};
+        state.lockSuits=track.suits.slice();
+        const shape=track.count>1?`の${track.count}枚組`:'';
+        state.log+=`(激縛り発動!次は${suitLabel}${nextRank}${shape}かJOKERしか出せません)`;
+      } else { state.lockSuits=track.suits.slice(); state.lockSeq=null; state.log+=`(マーク縛り発動!次は${suitLabel}のみ)`; }
+    } else if(!state.lockSeq){ state.lockSuits=track.suits.slice(); state.log+=`(マーク縛り発動!次は${suitLabel}のみ)`; }
+  }
+  state.prevTrack=track;
+}
+
+/* ---------- turn engine ---------- */
+function advance(fromIndex,{tobiSteps=1}={}){
+  let i=fromIndex;
+  for(let s=0;s<tobiSteps;s++) i=nextActiveRaw(i);
+  const rawLanding=i;
+  const owner=state.fieldOwner;
+  const ownerActive = owner!==null && owner!==undefined && !state.players[owner].finished;
+  // 場の所有者以外に、まだこのトリックへ応答していないアクティブプレイヤーがいるか
+  // (所有者自身が上がり/反則で非アクティブになっていても正しく判定できる形にする)
+  const othersStillToAct = state.players.some((p,idx)=>!p.finished && idx!==owner && !state.passedThisField.has(idx));
+  let landingIndex, skipOverlay;
+  if(!othersStillToAct){
+    skipOverlay=(rawLanding===owner && fromIndex===owner && ownerActive);
+    clearFieldStateKeepScore();
+    landingIndex = ownerActive ? owner : i;
+  } else {
+    while(i!==owner && state.passedThisField.has(i)) i=nextActiveRaw(i);
+    skipOverlay=false;
+    if(ownerActive && i===owner){
+      // 5飛び等で誰も出さずに場の所有者へ戻った → 自動で場を流し、所有者が親になる
+      skipOverlay=(fromIndex===owner);
+      clearFieldStateKeepScore();
+    }
+    landingIndex=i;
+  }
+  state.currentIndex=landingIndex;
+  state.selected=new Set();
+  if(isSelfMode() || skipOverlay){
+    state.screen='play'; state.continuedTurn=skipOverlay;
+  } else {
+    state.screen='reveal'; state.pendingIndex=landingIndex; state.continuedTurn=false;
+  }
+}
+function currentRate(){ return Math.pow(2,state.revolutionCount) * state.foulRateMultiplier; }
+// ラウンド終了判定: アクティブ(未上がり・未反則)なプレイヤーが1人以下になったら終了。
+// 反則者が出たこと自体はラウンド終了理由にならない。
+function finalizeRoundIfEnded(){
+  const remaining=activePlayers();
+  if(remaining.length>1) return false;
+  if(remaining.length===1){
+    const idx=state.players.indexOf(remaining[0]);
+    state.players[idx].finished=true;
+    state.finishOrder.push(idx);
+  }
+  // 反則者は最下位側(finishOrder末尾)へ。先に反則したプレイヤーほど下位になるよう、発生順を逆にして追加する。
+  state.foulOrder.slice().reverse().forEach(idx=>state.finishOrder.push(idx));
+  if(state.pendingFoulPenalties.length>0){
+    applyPendingFoulPenaltiesToWinner();
+  } else {
+    calculateRoundScore();
+  }
+  state.screen='result';
+  return true;
+}
+function calculateRoundScore(){
+  const n=state.players.length;
+  const winnerIdx=state.finishOrder[0];
+  const loserIdx=state.finishOrder[n-1];
+  const loserHand=state.players[loserIdx].hand.length;
+  const multiplier=Math.pow(2,state.revolutionCount);
+  const points=loserHand*100*multiplier;
+  state.players[loserIdx].score-=points;
+  state.players[winnerIdx].score+=points;
+  state.lastRoundPoints=points;
+}
+// 反則者ごとに直前に減点した分と同額を、そのラウンドの最終的な勝者(finishOrder[0])へ合算して加算する。
+// pendingFoulPenaltiesはラウンド終了時に一度だけ消費され、二重精算はしない。
+function applyPendingFoulPenaltiesToWinner(){
+  const winnerIdx=state.finishOrder[0];
+  let total=0;
+  state.pendingFoulPenalties.forEach(p=>{ total+=p.penaltyPoints; });
+  state.players[winnerIdx].score+=total;
+  state.lastRoundPoints=total;
+}
+// 反則者を即座に脱落させ、その時点のレートを2倍にしたうえで反則Ptを減点する。
+// ラウンドは終了しない(finalizeRoundIfEndedがアクティブ人数を見て判断する)。戻り値: ラウンドが終了したか。
+function commitFoulPenalty(actorIndex, reasonText, foulCardCountAtFoul){
+  state.effectQueue=[];
+  state.pendingAfterQueue=null;
+  const rateBefore=currentRate();
+  state.foulRateMultiplier*=2;
+  const rateAfter=currentRate();
+  const penaltyPoints=foulCardCountAtFoul*100*rateAfter;
+  state.players[actorIndex].score-=penaltyPoints;
+  state.players[actorIndex].finished=true;
+  state.players[actorIndex].fouled=true;
+  state.foulOrder.push(actorIndex);
+  state.pendingFoulPenalties.push({playerId:actorIndex, reason:reasonText, cardCountAtFoul:foulCardCountAtFoul, rateBefore, rateAfter, penaltyPoints});
+  state.foulPenalty={name:state.players[actorIndex].name, amount:penaltyPoints, reason:reasonText, cardCount:foulCardCountAtFoul, rate:rateAfter};
+  state.log=`⚠️ ${state.players[actorIndex].name} が${reasonText}で反則!(-${penaltyPoints}pt, レート${rateAfter}倍) ラウンドは継続します`;
+  return finalizeRoundIfEnded();
+}
+
+/* ---------- play resolution ---------- */
+function applyPlay(playerIndex,cardIds,jokerAssignment){
+  const v=evaluateSelection(playerIndex,cardIds,jokerAssignment);
+  if(!v.ok) return false;
+  const player=state.players[playerIndex];
+  const handBeforePlay=player.hand.slice();
+  const wasLeading=state.field===null;
+  const reversedAtValidation=effectiveReversed();
+
+  if(!player.isCPU && isSelfMode()){
+    if(wasLeading){
+      if(v.count<=1) state.learnedStats.leadSmall++; else state.learnedStats.leadBig++;
+      saveLearnedStats();
+    } else if(usesPremiumCheck(v)){
+      const otherCandidates=generateCandidates(player.hand).map(arr=>evaluateSelection(playerIndex,arr.map(c=>c.id))).filter(x=>x.ok);
+      const hadNonPremiumOption=otherCandidates.some(x=>!usesPremiumCheck(x));
+      if(hadNonPremiumOption){ state.learnedStats.premiumUsed++; saveLearnedStats(); }
+    }
+  }
+
+  player.hand=player.hand.filter(c=>!cardIds.includes(c.id));
+  state.field={type:v.type,rank:v.rank,count:v.count,cards:v.cards,suitsUsed:v.suitsUsed,jokerAssignment:v.effectiveJokerAssignment||null};
+  state.fieldOwner=playerIndex;
+  state.selected=new Set();
+  state.trickHistory.push({type:v.type,rank:v.rank,count:v.count,cards:v.cards,suitsUsed:v.suitsUsed,jokerAssignment:v.effectiveJokerAssignment||null,
+    straightRanks:v.straightRanks,name:player.name,playerIndex,kind:'play'});
+
+  let logMsg=`${player.name} が ${describePlay(v)} を出した`;
+  let effects=[];
+  if(v.type==='set') effects.push({rank:v.rank,count:v.count});
+  else v.straightRanks.forEach(r=>{ if(EFFECT_RANKS.includes(r) || r==='8') effects.push({rank:r,count:1}); });
+
+  if(v.count>=4){
+    state.revolutionCount++;
+    logMsg+=`(革命!累計${state.revolutionCount}回)`;
+  }
+
+  let cutFlag=false, tobiSteps=0;
+  const queue=[];
+  ['6','J','7','10','5','8'].forEach(r=>{
+    const e=effects.find(x=>x.rank===r);
+    if(!e) return;
+    if(r==='6'){ state.lockSuits=v.suitsUsed.slice(); state.lockSeq=null; logMsg+=`(6ロック発動!次は${state.lockSuits.join('/')}のみ)`; }
+    if(r==='J'){ state.tempReversed=!state.tempReversed; logMsg+='(強さ反転)'; }
+    if(r==='7'){ queue.push({type:'give',n:e.count}); }
+    if(r==='10'){ queue.push({type:'discard',n:e.count}); }
+    if(r==='5'){
+      const skipAmount=2*e.count-1;
+      const otherActiveCount=state.players.filter((p,i)=>i!==playerIndex && !p.finished).length;
+      if(skipAmount>=otherActiveCount){
+        cutFlag=true;
+        logMsg+='(5飛び!全員飛ばされたので場が流れます)';
+      } else {
+        tobiSteps+=skipAmount+1;
+        logMsg+='(5飛び)';
+      }
+    }
+    if(r==='8'){ cutFlag=true; logMsg+='(8切り)'; }
+  });
+  if(v.isSpade3Counter){ cutFlag=true; tobiSteps=0; logMsg+='(スペ3でジョーカーを撃破!ターン終了)'; }
+  updateSuitChain(v,reversedAtValidation);
+
+  const finishedNow=player.hand.length===0;
+  if(finishedNow){
+    const contentFoul=evaluateFoulFinish(v, handBeforePlay);
+    const unfulfillableGiveDiscard = queue.length>0;
+    const foulReasons=[...contentFoul.reasons];
+    if(unfulfillableGiveDiscard) foulReasons.push(...queue.map(q=>q.type==='give'?'seven_unfulfilled':'ten_unfulfilled'));
+    if(foulReasons.length>0){
+      state.log=logMsg;
+      const reasonText = foulReasons.includes('seven_unfulfilled') || foulReasons.includes('ten_unfulfilled')
+        ? queue.map(q=>q.type==='give'?'7渡し':'10捨て').join('・')
+        : '禁止上がり('+foulReasons.join('・')+')';
+      const roundEnded = commitFoulPenalty(playerIndex, reasonText, v.count);
+      if(!roundEnded) advance(playerIndex,{tobiSteps:1}); // 反則者を除外して残りプレイヤーで続行
+      render(); return true;
+    }
+    player.finished=true; state.finishOrder.push(playerIndex);
+    logMsg+=` → ${player.name}が上がりました!`;
+  }
+  state.log=logMsg;
+
+  state.pendingFoulPlayCount = v.count;
+
+  if(finishedNow){
+    if(finalizeRoundIfEnded()){ render(); return true; }
+    advance(playerIndex,{tobiSteps:1}); // 上がったカードは場に残したまま、次のアクティブプレイヤーへ
+    render(); return true;
+  }
+
+  if(cutFlag) state.pendingAfterQueue={mode:'cut',owner:playerIndex};
+  else if(tobiSteps>0) state.pendingAfterQueue={mode:'tobi',from:playerIndex,steps:tobiSteps};
+  else state.pendingAfterQueue={mode:'normal',from:playerIndex};
+
+  state.effectQueue=queue;
+  processNextQueueItem(playerIndex);
+  render();
+  return true;
+}
+function resolveTurnFlow(){
+  const paq=state.pendingAfterQueue; state.pendingAfterQueue=null;
+  if(!paq) return;
+  if(paq.mode==='cut'){ clearFieldStateKeepScore(); state.currentIndex=paq.owner; state.screen='play'; state.selected=new Set(); state.continuedTurn=true; }
+  else if(paq.mode==='tobi') advance(paq.from,{tobiSteps:paq.steps});
+  else advance(paq.from,{tobiSteps:1});
+}
+function processNextQueueItem(actorIndex){
+  if(state.effectQueue.length===0){ resolveTurnFlow(); return; }
+  const item=state.effectQueue.shift();
+  const player=state.players[actorIndex];
+  if(player.hand.length<item.n){
+    const roundEnded = commitFoulPenalty(actorIndex, item.type==='give'?'7渡し':'10捨て', state.pendingFoulPlayCount);
+    if(!roundEnded) advance(actorIndex,{tobiSteps:1});
+    return;
+  }
+  const need=item.n;
+  if(player.isCPU){
+    const ids=pickCardsToOffload(player.hand,need).map(c=>c.id);
+    const finished=resolveGiveDiscardCore(actorIndex,item.type,ids);
+    if(!finished) processNextQueueItem(actorIndex);
+  } else {
+    state.pendingAction=item.type; state.pendingCount=need; state.pendingActor=actorIndex;
+    state.selected=new Set(); state.screen=item.type;
+  }
+}
+function resolveGiveDiscardCore(actorIndex,type,ids){
+  const player=state.players[actorIndex];
+  const chosen=player.hand.filter(c=>ids.includes(c.id));
+  player.hand=player.hand.filter(c=>!ids.includes(c.id));
+  if(type==='give'){
+    const nextIdx=nextActiveRaw(actorIndex);
+    state.players[nextIdx].hand=state.players[nextIdx].hand.concat(chosen);
+    state.log+=` / ${player.name}が${chosen.length}枚渡した`;
+  } else {
+    state.log+=` / ${player.name}が${chosen.length}枚捨てた`;
+  }
+  state.pendingAction=null; state.pendingCount=0; state.pendingActor=null; state.selected=new Set();
+  if(player.hand.length===0 && !player.finished){
+    player.finished=true; state.finishOrder.push(actorIndex);
+    state.log+=` → ${player.name}が上がりました!`;
+    if(finalizeRoundIfEnded()) return true;
+    state.effectQueue=[];
+    state.pendingAfterQueue=null;
+    advance(actorIndex,{tobiSteps:1}); // 上がったカードは場に残したまま、次のアクティブプレイヤーへ
+    return true;
+  }
+  return false;
+}
+function confirmGiveDiscard(){
+  if(state.selected.size!==state.pendingCount) return;
+  const actorIndex=state.pendingActor, type=state.pendingAction, ids=[...state.selected];
+  const finished=resolveGiveDiscardCore(actorIndex,type,ids);
+  if(!finished) processNextQueueItem(actorIndex);
+  render();
+}
+function passTurn(){
+  if(state.field===null) return;
+  const idx=state.currentIndex;
+  const player=state.players[idx];
+  if(!player.isCPU && isSelfMode()){
+    const cands=generateCandidates(player.hand).map(arr=>evaluateSelection(idx,arr.map(c=>c.id))).filter(x=>x.ok);
+    if(cands.length>0 && cands.every(x=>usesPremiumCheck(x))){
+      state.learnedStats.premiumHeld++; saveLearnedStats();
+    }
+  }
+  state.passedThisField.add(idx);
+  state.log=`${state.players[idx].name} がパス`;
+  state.trickHistory.push({kind:'pass',name:state.players[idx].name,playerIndex:idx});
+  advance(idx,{tobiSteps:1});
+  render();
+}
+function toggleSelect(id){ if(state.selected.has(id)) state.selected.delete(id); else state.selected.add(id); render(); }
+function clearSelection(){ state.selected=new Set(); render(); }
+function playSelected(){
+  const ids=[...state.selected];
+  const v=evaluateSelection(state.currentIndex, ids);
+  if(!v.ok) return;
+  const choices=getJokerChoices(state.currentIndex, ids);
+  if(choices && choices.length>=2){
+    state.pendingJokerChoices=choices;
+    state.pendingJokerCardIds=ids;
+    render();
+    return;
+  }
+  applyPlay(state.currentIndex, ids);
+}
+function confirmJokerChoice(choice){
+  const ids=state.pendingJokerCardIds;
+  state.pendingJokerChoices=null; state.pendingJokerCardIds=null;
+  applyPlay(state.currentIndex, ids, choice.assignment);
+}
+function cancelJokerChoice(){
+  state.pendingJokerChoices=null; state.pendingJokerCardIds=null;
+  render();
+}
+
+/* ---------- candidate generation (used only as a deadlock safety-net) ---------- */
+function generateCandidates(hand){
+  const candidates=[];
+  const byRank={};
+  hand.forEach(c=>{(byRank[c.rank]=byRank[c.rank]||[]).push(c);});
+  Object.values(byRank).forEach(group=>{ for(let k=1;k<=group.length;k++) candidates.push(group.slice(0,k)); });
+  const bySuit={};
+  hand.forEach(c=>{ if(c.suit) (bySuit[c.suit]=bySuit[c.suit]||[]).push(c); });
+  Object.values(bySuit).forEach(cards=>{
+    const sorted=cards.slice().sort((a,b)=>RANKS.indexOf(a.rank)-RANKS.indexOf(b.rank));
+    let run=[sorted[0]];
+    const flush=(run)=>{
+      if(run.length>=3){
+        for(let len=3;len<=run.length;len++) for(let start=0;start+len<=run.length;start++) candidates.push(run.slice(start,start+len));
+      }
+    };
+    for(let i=1;i<sorted.length;i++){
+      if(RANKS.indexOf(sorted[i].rank)===RANKS.indexOf(sorted[i-1].rank)+1) run.push(sorted[i]);
+      else { flush(run); run=[sorted[i]]; }
+    }
+    flush(run);
+  });
+  return candidates;
+}
+// JOKER+実カードの組み合わせ候補(セット・階段)を発見する。実際の合法性・JOKER解釈はevaluateSelection/cpuChooseJokerAssignmentに委譲する(判定ロジックを重複実装しない)。
+function generateJokerCombinedCandidates(hand){
+  const jokers=hand.filter(c=>c.rank==='JOKER');
+  if(jokers.length===0) return [];
+  const realCards=hand.filter(c=>c.rank!=='JOKER');
+  const out=[];
+  // セット: 同じランクの実カード(1枚以上)+ JOKER(1枚以上)
+  const byRank={};
+  realCards.forEach(c=>{ (byRank[c.rank]=byRank[c.rank]||[]).push(c); });
+  Object.values(byRank).forEach(group=>{
+    for(let realCount=1; realCount<=group.length; realCount++){
+      const realSubset=group.slice(0,realCount);
+      for(let jc=1; jc<=jokers.length; jc++){
+        out.push([...realSubset, ...jokers.slice(0,jc)]);
+      }
+    }
+  });
+  // 階段: 同じスートの実カードの連続部分列ごとに、enumerateStraightWindowsで欠損補完・延長の両方を考慮する
+  const bySuit={};
+  realCards.forEach(c=>{ if(c.suit) (bySuit[c.suit]=bySuit[c.suit]||[]).push(c); });
+  Object.values(bySuit).forEach(cards=>{
+    const sorted=cards.slice().sort((a,b)=>RANKS.indexOf(a.rank)-RANKS.indexOf(b.rank));
+    for(let i=0;i<sorted.length;i++){
+      for(let j=i;j<sorted.length;j++){
+        const subset=sorted.slice(i,j+1);
+        for(let jc=1; jc<=jokers.length; jc++){
+          const windows=enumerateStraightWindows(subset, jc);
+          if(windows.length>0) out.push([...subset, ...jokers.slice(0,jc)]);
+        }
+      }
+    }
+  });
+  return out;
+}
+function cardPreciousness(card){
+  if(card.rank==='JOKER') return 100;
+  if(card.suit==='♠' && card.rank==='3') return 90;
+  if(card.rank==='2') return 80;
+  if(card.rank==='A') return 60;
+  if(card.rank==='8'||card.rank==='10') return 50;
+  if(card.rank==='J'||card.rank==='6'||card.rank==='5') return 30;
+  return RANKS.indexOf(card.rank);
+}
+/* ---------- JOKER代替候補: 責務ごとに分離(engine.jsと同一仕様) ---------- */
+function enumerateRawJokerCandidates(hand, cardIds){
+  const cards=hand.filter(c=>cardIds.includes(c.id));
+  const jokers=cards.filter(c=>c.rank==='JOKER');
+  const realCards=cards.filter(c=>c.rank!=='JOKER');
+  if(jokers.length===0 || realCards.length===0) return [];
+  const realRanksArr=realCards.map(c=>c.rank);
+  const allSameRank=realRanksArr.every(r=>r===realRanksArr[0]);
+  const raw=[];
+  if(allSameRank){
+    const usedSuits=realCards.map(c=>c.suit);
+    const availableSuits=SUITS.filter(s=>!usedSuits.includes(s));
+    const combos=kCombinations(availableSuits, jokers.length);
+    combos.forEach(comboSuits=>{
+      const assignment=jokers.map((j,i)=>({id:j.id, suit:comboSuits[i], rank:realRanksArr[0]}));
+      raw.push({type:'set', assignment, previewSuitsUsed:[...new Set([...usedSuits,...comboSuits])].sort(), previewRank:realRanksArr[0]});
+    });
+  } else {
+    const suits=realCards.map(c=>c.suit);
+    if(!suits.every(s=>s===suits[0])) return [];
+    const windows=enumerateStraightWindows(realCards, jokers.length);
+    windows.forEach(w=>{
+      const assignment=jokers.map((j,i)=>({id:j.id, suit:w.suit, rank:w.jokerRanks[i]}));
+      raw.push({type:'straight', assignment, previewSuitsUsed:[w.suit], previewRank:w.straightRanks[w.straightRanks.length-1], previewStraightRanks:w.straightRanks});
+    });
+  }
+  return raw;
+}
+function candidateSignature(cand){
+  if(cand.type==='straight') return `straight:${cand.previewSuitsUsed[0]}:${cand.previewStraightRanks.join('-')}`;
+  return `set:${cand.previewRank}:${cand.previewSuitsUsed.slice().sort().join(',')}`;
+}
+function dedupeCandidates(rawList){
+  const seen=new Set(); const out=[];
+  rawList.forEach(c=>{ const sig=candidateSignature(c); if(!seen.has(sig)){ seen.add(sig); out.push(c); } });
+  return out;
+}
+function filterLegalCandidates(playerIndex, cardIds, candidates){
+  return candidates
+    .map(c=>({...c, evalResult: evaluateSelection(playerIndex, cardIds, c.assignment)}))
+    .filter(c=>c.evalResult.ok);
+}
+function labelForCandidate(cand){
+  if(cand.type==='straight'){
+    const jokerRanksLabel=cand.assignment.map(a=>a.suit+a.rank).join('・');
+    return `JOKERを${jokerRanksLabel}として使う(完成形: ${cand.previewSuitsUsed[0]}${cand.previewStraightRanks.join('-')})`;
+  }
+  const jokerLabel=cand.assignment.map(a=>a.suit+a.rank).join('・');
+  return `JOKERを${jokerLabel}として使う`;
+}
+function getJokerChoices(playerIndex, cardIds){
+  const player=state.players[playerIndex];
+  const raw=enumerateRawJokerCandidates(player.hand, cardIds);
+  if(raw.length===0) return null;
+  const deduped=dedupeCandidates(raw);
+  const legal=filterLegalCandidates(playerIndex, cardIds, deduped);
+  if(legal.length<=1) return null;
+  return legal.map(c=>({label:labelForCandidate(c), assignment:c.assignment}));
+}
+function cpuChooseJokerAssignment(playerIndex, cardIds){
+  const player=state.players[playerIndex];
+  const raw=dedupeCandidates(enumerateRawJokerCandidates(player.hand, cardIds));
+  const legal=filterLegalCandidates(playerIndex, cardIds, raw);
+  if(legal.length===0) return null;
+  const wouldFinishPlay = cardIds.length===player.hand.length;
+  // 反則上がりにならない候補を優先(SET/STRAIGHTのランク・スート次第で反則有無が変わりうるため、割り当てごとに再確認する)
+  const safeLegal = legal.filter(cand=>{
+    if(!wouldFinishPlay) return true;
+    const fc = evaluateFoulFinish(cand.evalResult, player.hand);
+    return !fc.isFoul;
+  });
+  const pool = safeLegal.length>0 ? safeLegal : legal;
+  const remainingAfterPlay=player.hand.filter(c=>!cardIds.includes(c.id));
+  const suitCounts={}; SUITS.forEach(s=>suitCounts[s]=0);
+  remainingAfterPlay.forEach(c=>{ if(c.suit) suitCounts[c.suit]++; });
+  let best=null, bestScore=Infinity;
+  pool.forEach(cand=>{
+    const v=cand.evalResult;
+    let score=currentStrength(v.rank);
+    const suitPenalty=cand.assignment.reduce((s,a)=>s+(suitCounts[a.suit]||0),0);
+    score+=suitPenalty*0.01;
+    if(score<bestScore){ bestScore=score; best=cand; }
+  });
+  return best ? best.assignment : null;
+}
+function pickCardsToOffload(hand,need){
+  return hand.slice().sort((a,b)=>cardPreciousness(a)-cardPreciousness(b)).slice(0,need);
+}
+function wouldFoulFinish(v, handLength){
+  if(v.count!==handLength) return false;
+  const contentFoul = evaluateFoulFinish(v, {length: handLength});
+  if(contentFoul.isFoul) return true;
+  const ranks=v.type==='straight'?v.straightRanks:[v.rank];
+  if(ranks.includes('7')||ranks.includes('10')) return true; // 手札が0枚になるため7渡し/10捨てを完遂できない
+  return false;
+}
+function candidateHasSafeInterpretation(idx, arr, v){
+  const player=state.players[idx];
+  if(v.count!==player.hand.length) return true; // 上がりでなければ反則対象外
+  const hasJoker = arr.some(c=>c.rank==='JOKER');
+  if(!hasJoker) return !wouldFoulFinish(v, player.hand.length);
+  const cardIds=arr.map(c=>c.id);
+  const raw=dedupeCandidates(enumerateRawJokerCandidates(player.hand, cardIds));
+  const legal=filterLegalCandidates(idx, cardIds, raw);
+  if(legal.length===0) return !wouldFoulFinish(v, player.hand.length); // 純JOKER等、選択肢が無い場合はデフォルト評価にフォールバック
+  return legal.some(cand=>!evaluateFoulFinish(cand.evalResult, player.hand).isFoul);
+}
+function aiChooseMove(idx){
+  const player=state.players[idx];
+  const raw=[...generateCandidates(player.hand), ...generateJokerCombinedCandidates(player.hand)];
+  const allOk=raw.map(arr=>({arr,v:evaluateSelection(idx,arr.map(c=>c.id))})).filter(x=>x.v.ok);
+  const safe=allOk.filter(x=>candidateHasSafeInterpretation(idx,x.arr,x.v));
+  let candidates;
+  if(safe.length>0) candidates=safe;
+  else if(state.field===null) candidates=allOk;
+  else return null;
+  if(candidates.length===0) return null;
+
+  const activeOthers=state.players.filter((p,i)=>i!==idx && !p.finished);
+  const dangerNearby=activeOthers.some(p=>p.hand.length<=2);
+  const someoneFinished=state.finishOrder.length>0;
+  const myHandSize=player.hand.length;
+  const avgOthers=activeOthers.length ? activeOthers.reduce((s,p)=>s+p.hand.length,0)/activeOthers.length : myHandSize;
+  const trailing=someoneFinished && myHandSize>avgOthers; // relatively more cards than others -> at risk of finishing last
+
+  const bigLeadBias=learnedBigLeadBias(); // 0..1, learned from the human's own leads (0.5 = no data yet)
+  const premiumAggression=learnedPremiumAggression(); // 0..1, learned from the human's own premium-card usage
+
+  function isRisky(v){
+    const ranksInvolved=v.type==='straight'?v.straightRanks:[v.rank];
+    const revActive = state.revolutionCount%2===1;
+    return ranksInvolved.includes('2') || ranksInvolved.includes('8') || v.cards.some(c=>c.rank==='JOKER') || (revActive && ranksInvolved.includes('3'));
+  }
+  // ---- 軽量な1手先読み: このプレイ後に残る手札がどれだけ危険な構成になるかを評価 ----
+  const revActiveNow = state.revolutionCount%2===1;
+  const isRiskyCard = c => c.rank==='JOKER' || c.rank==='8' || (revActiveNow ? c.rank==='3' : c.rank==='2');
+  // 現時点でJOKERを安全なセット/階段として消化できる機会があるか(このターン限りの機会かどうかの目安に使う)
+  const jokerSafeOpportunityNow = player.hand.some(c=>c.rank==='JOKER') && allOk.some(x=>{
+    if(!x.arr.some(c=>c.rank==='JOKER')) return false;
+    if(x.arr.length===player.hand.length) return false; // 上がり手は機会損失の対象外(別途評価済み)
+    return candidateHasSafeInterpretation(idx, x.arr, x.v);
+  });
+  function remainingHandRisk(arr){
+    const usedIds=new Set(arr.map(c=>c.id));
+    const remaining=player.hand.filter(c=>!usedIds.has(c.id));
+    if(remaining.length===0) return 0; // 上がり自体は別枠で評価済み
+    const riskyCards=remaining.filter(isRiskyCard);
+    const safeCards=remaining.filter(c=>!isRiskyCard(c));
+    let risk=0;
+    if(safeCards.length===0 && riskyCards.length>0) risk += 600*riskyCards.length; // 残り全てが危険牌になる=最も避けたい状態
+    else if(riskyCards.length>0) risk += (riskyCards.length/remaining.length) * 300; // 危険牌の比率が高いほど加点
+    if(remaining.length===1){
+      if(remaining[0].rank==='JOKER') risk += 480; // 最後にJOKER単体だけが残る状態を強く回避
+      else if(isRiskyCard(remaining[0])) risk += 300; // 最後に危険牌単体が残る状態も回避
+    }
+    if(remaining.length===2 && safeCards.length===0) risk += 200; // 残り2枚とも危険牌の状態も強めに回避
+    const loneEffectRanks=remaining.filter(c=>c.rank==='7'||c.rank==='10');
+    if(loneEffectRanks.length>0 && remaining.length<=2) risk += 80*loneEffectRanks.length; // 7/10を最後まで残すと未完遂上がりになりやすい
+    // このプレイでJOKERを使わず温存した場合、今が安全に消化できる貴重な機会なら機会損失として加点
+    const usesJoker=arr.some(c=>c.rank==='JOKER');
+    if(!usesJoker && jokerSafeOpportunityNow && remaining.some(c=>c.rank==='JOKER') && myHandSize<=8) risk += 110;
+    return risk;
+  }
+  // ---- 2手目簡易シミュレーション: このプレイ後に残る手札で、次に自分が空場から出すとしたら
+  // どれくらい良い手が打てるか(強さ・上がりやすさ)を粗く見積もり、有利な手札構成を残す選択を後押しする。
+  // 相手の手札は分からないため、あくまで自分の手札の質を測る目安として使う軽量な先読み。
+  function simulateHandPotential(remaining){
+    if(remaining.length===0) return -900; // 上がり済み相当、最も良い状態
+    const savedHand=player.hand, savedField=state.field, savedLockSuits=state.lockSuits, savedLockSeq=state.lockSeq;
+    try{
+      player.hand=remaining; state.field=null; state.lockSuits=null; state.lockSeq=null;
+      const raw2=[...generateCandidates(remaining), ...generateJokerCombinedCandidates(remaining)];
+      const ok2=raw2.map(arr2=>({arr2,v2:evaluateSelection(idx,arr2.map(c=>c.id))})).filter(x=>x.v2.ok);
+      if(ok2.length===0) return 400; // 出せる手がない(理論上ほぼ起きないが念のため)
+      let best=Infinity;
+      ok2.forEach(x=>{
+        let s=currentStrength(x.v2.rank)*10 - x.v2.count*3;
+        if(x.v2.count===remaining.length && candidateHasSafeInterpretation(idx, x.arr2, x.v2)) s-=400; // 次で安全に上がれるなら非常に良い
+        if(s<best) best=s;
+      });
+      return best;
+    } finally {
+      player.hand=savedHand; state.field=savedField; state.lockSuits=savedLockSuits; state.lockSeq=savedLockSeq;
+    }
+  }
+  function score(v, arr){
+    // 複数枚出しへの加点は、ランクの強さ差を覆すほど強くしすぎない(枚数よりカードの価値を優先)
+    let s=currentStrength(v.rank)*10 - v.count*2*(0.3+bigLeadBias*0.4);
+    if(usesPremiumCheck(v)) s+=22;
+    if(v.type==='straight') s-=3;
+    if(trailing) s-=v.count*3;
+    const isFinishingPlay = v.count===myHandSize;
+    const safeInterp = candidateHasSafeInterpretation(idx, arr, v);
+    if(isFinishingPlay && safeInterp) s-=800; // 非反則で上がれる手には大きなプラス評価(スコアは低いほど優先)
+    // 反則リスクを減らすための手札整理: 手札が少なくなるほど、危険牌(2/8/JOKER/革命時3)を安全なうちに処理する緊急度を上げる
+    // 手札に余裕がある序盤(8枚以上)は緊急度0とし、強い/貴重なカードを早々に手放さないようにする
+    const urgency = Math.max(0, 8 - myHandSize) * 1.1;
+    if(!isFinishingPlay && isRisky(v) && v.count>=2) s-=160*urgency;
+    else if(!isFinishingPlay && isRisky(v)) s-=25*urgency;
+    if(!isFinishingPlay) s += remainingHandRisk(arr); // 1手先読み: プレイ後に残る手札の危険度を加点
+    // JOKERは温存価値が高いカードなので、緊急度が低い(手札に余裕がある)平時に上がり以外の理由で
+    // 安易に使う(特に弱いカードとの組み合わせで浪費する)手を強く抑制する
+    if(!isFinishingPlay && v.cards.some(c=>c.rank==='JOKER') && urgency<0.5) s+=250;
+    if(isFinishingPlay && !safeInterp) s+=100000; // 反則上がりになる手には極めて大きなマイナス評価(safeフィルタ済みでも念のため)
+    return s;
+  }
+  candidates.sort((a,b)=>score(a.v,a.arr)-score(b.v,b.arr));
+  // 2手目簡易シミュレーションは計算コストが高いため、まず軽量スコアで上位候補に絞ってから、
+  // その中だけをシミュレーション込みで再評価する(手札が多いほど候補数が増えても処理が重くならないようにする)。
+  const TOP_K=8;
+  const shortlist=candidates.slice(0,TOP_K);
+  function refinedScore(v, arr){
+    const isFinishingPlay = v.count===myHandSize;
+    if(isFinishingPlay) return score(v,arr); // 上がり手は既に十分評価済みなのでそのまま
+    const usedIds2=new Set(arr.map(c=>c.id));
+    const remaining2=player.hand.filter(c=>!usedIds2.has(c.id));
+    return score(v,arr) + simulateHandPotential(remaining2)*0.15; // 2手目簡易シミュレーション(軽めの重み、微調整用)
+  }
+  shortlist.sort((a,b)=>refinedScore(a.v,a.arr)-refinedScore(b.v,b.arr));
+  candidates=shortlist.concat(candidates.slice(TOP_K));
+  const best=candidates[0];
+
+  if(state.field!==null && usesPremiumCheck(best.v) && !dangerNearby && !trailing){
+    const holdProb=Math.min(0.9, Math.max(0.1, 0.2 + (1-premiumAggression)*0.55 + myHandSize*0.04));
+    if(myHandSize>3 && Math.random()<holdProb) return null;
+  }
+  return best.arr;
+}
+function scheduleCPU(){
+  const idx=state.currentIndex;
+  setTimeout(()=>{
+    if(isSelfMode() && state.screen==='play' && state.currentIndex===idx && state.players[idx].isCPU && !state.players[idx].finished){
+      const move=aiChooseMove(idx);
+      if(move){
+        const cardIds=move.map(c=>c.id);
+        const jokerAssignment=cpuChooseJokerAssignment(idx, cardIds); // 有効候補が複数ある場合、CPUの思考ルーチンで評価して選ぶ(配列の先頭を機械的に選ばない)
+        applyPlay(idx, cardIds, jokerAssignment);
+      }
+      else passTurn();
+    }
+  },700);
+}
+
+/* ---------- rendering ---------- */
+function el(tag,attrs={},children=[]){
+  const e=document.createElement(tag);
+  Object.entries(attrs).forEach(([k,v])=>{
+    if(k==='class') e.className=v;
+    else if(k==='text') e.textContent=v;
+    else if(k.startsWith('on')) e.addEventListener(k.slice(2),v);
+    else if(v!==null && v!==undefined) e.setAttribute(k,v);
+  });
+  (Array.isArray(children)?children:[children]).forEach(c=>{ if(c) e.appendChild(c); });
+  return e;
+}
+function reorderHand(player, srcId, targetId){
+  const srcIdx=player.hand.findIndex(c=>c.id===srcId);
+  const tgtIdx=player.hand.findIndex(c=>c.id===targetId);
+  if(srcIdx<0||tgtIdx<0) return;
+  const [moved]=player.hand.splice(srcIdx,1);
+  player.hand.splice(tgtIdx,0,moved);
+}
+function buildFanRow(cards, optsFn){
+  const row=el('div',{class:'hand-row-fan'});
+  const n=cards.length;
+  const cardWidth=50;
+  const minVisible=24;
+  const targetWidth=Math.min((typeof window!=='undefined'?window.innerWidth:400)-40, 640);
+  let overlap=0;
+  if(n>1){
+    overlap=Math.max(0,(cardWidth*n-targetWidth)/(n-1));
+    overlap=Math.min(overlap,cardWidth-minVisible);
+  }
+  cards.forEach((card,i)=>{
+    const c=cardEl(card, optsFn(card));
+    if(i>0) c.style.marginLeft=(-overlap)+'px';
+    c.style.zIndex=String(i);
+    row.appendChild(c);
+  });
+  return row;
+}
+function cardEl(card,{selected=false,onClick=null,draggable=false}={}){
+  const cls=['card']; if(isRed(card.suit)) cls.push('red'); if(card.rank==='JOKER') cls.push('joker'); if(selected) cls.push('selected');
+  const c=el('div',{class:cls.join(' ')});
+  const corner=el('div',{class:'corner'});
+  if(card.rank==='JOKER'){ corner.appendChild(el('div',{class:'r',text:'JO'})); corner.appendChild(el('div',{class:'s',text:'★'})); }
+  else { corner.appendChild(el('div',{class:'r',text:card.rank})); corner.appendChild(el('div',{class:'s',text:card.suit})); }
+  c.appendChild(corner);
+  c.appendChild(el('div',{class:'center-suit',text: card.rank==='JOKER'?'★':card.suit}));
+  c.setAttribute('data-card-id',card.id);
+  if(draggable){
+    let startX=0,startY=0,down=false,moved=false;
+    const onDown=(e)=>{
+      down=true; moved=false; startX=e.clientX; startY=e.clientY;
+      try{ c.setPointerCapture(e.pointerId); }catch(err){}
+    };
+    const onMove=(e)=>{
+      if(!down) return;
+      const dx=e.clientX-startX, dy=e.clientY-startY;
+      if(!moved && (Math.abs(dx)>10 || Math.abs(dy)>10)) { moved=true; c.classList.add('dragging'); }
+      if(moved){ c.style.transform=`translate(${dx}px, ${dy*0.25}px)`; c.style.zIndex='60'; }
+    };
+    const onUp=(e)=>{
+      if(!down) return;
+      down=false;
+      c.style.transform=''; c.style.zIndex='';
+      c.classList.remove('dragging');
+      if(moved){
+        const target=document.elementFromPoint ? document.elementFromPoint(e.clientX,e.clientY) : null;
+        const targetCard=target && target.closest ? target.closest('.card') : null;
+        const targetId=targetCard ? targetCard.getAttribute('data-card-id') : null;
+        if(targetId && targetId!==card.id){
+          reorderHand(state.players[state.currentIndex], card.id, targetId);
+          render();
+        }
+      } else if(onClick){ onClick(); }
+    };
+    c.addEventListener('pointerdown',onDown);
+    c.addEventListener('pointermove',onMove);
+    c.addEventListener('pointerup',onUp);
+    c.addEventListener('pointercancel',()=>{ down=false; c.style.transform=''; c.style.zIndex=''; c.classList.remove('dragging'); });
+  } else if(onClick){
+    c.addEventListener('click',onClick);
+  }
+  return c;
+}
+function miniHandFan(count){
+  const wrap=el('div',{class:'mini-fan'});
+  const shown=Math.min(count,7);
+  for(let i=0;i<shown;i++){
+    const b=el('div',{class:'mini-back'});
+    b.style.left=(i*8)+'px'; b.style.zIndex=i;
+    wrap.appendChild(b);
+  }
+  wrap.appendChild(el('div',{class:'mini-count-badge',text:count+t('countSuffix')}));
+  return wrap;
+}
+function seededRand(seed){ const x=Math.sin(seed*12.9898)*43758.5453; return x-Math.floor(x); }
+function pileCluster(entry, idx, activeIdx){
+  const seed=idx*17+3;
+  const baseX=(seededRand(seed)-0.5)*150;
+  const baseY=(seededRand(seed+1)-0.5)*70;
+  const baseRot=(seededRand(seed+2)-0.5)*22;
+  const isActive=idx===activeIdx;
+  const wrap=el('div',{class:'pile-cluster'+(isActive?' active':'')});
+  wrap.style.left=`calc(50% + ${baseX}px)`;
+  wrap.style.top=`calc(50% + ${baseY}px)`;
+  wrap.style.transform=`translate(-50%,-50%) rotate(${baseRot}deg)`;
+  wrap.style.zIndex=idx+1;
+  let tagText=entry.name;
+  if(entry.jokerAssignment && entry.jokerAssignment.length>0){
+    tagText += ' ('+entry.jokerAssignment.map(a=>a.rank==='JOKER'?'JOKER':`JOKER→${(a.suit||'')}${a.rank}`).join('・')+')';
+  }
+  wrap.appendChild(el('div',{class:'pile-tag',text:tagText}));
+  const cardsWrap=el('div',{class:'pile-cards'});
+  entry.cards.forEach(card=>{
+    const c=el('div',{class:'pile-card'+(isRed(card.suit)?' red':'')+(card.rank==='JOKER'?' joker':'')});
+    if(card.rank==='JOKER'){ c.appendChild(el('div',{class:'rj',text:'JOKER'})); c.appendChild(el('div',{class:'s',text:'★'})); }
+    else { c.appendChild(el('div',{class:'r',text:card.rank})); c.appendChild(el('div',{class:'s',text:card.suit})); }
+    cardsWrap.appendChild(c);
+  });
+  wrap.appendChild(cardsWrap);
+  return wrap;
+}
+
+function renderSetup(root){
+  const wrap=el('div',{class:'setup-wrap'}); const card=el('div',{class:'setup-card'});
+  card.appendChild(buildLangSwitch());
+  const brand=el('div',{class:'brand'});
+  brand.appendChild(el('div',{class:'kanji',text:t('brandKanji')}));
+  brand.appendChild(el('span',{class:'en',text:t('brandEn')}));
+  brand.appendChild(el('div',{class:'suits',text:'♠ ♥ ♦ ♣'}));
+  card.appendChild(brand);
+
+  const sec0=el('div',{class:'setup-section'});
+  sec0.appendChild(el('div',{class:'setup-label',text:t('opponentLabel')}));
+  const modeRow=el('div',{class:'count-row'});
+  modeRow.appendChild(el('button',{class:'count-btn'+(state.mode==='local'?' active':''),text:t('tabLocal'),onclick:()=>{state.mode='local';render();}}));
+  modeRow.appendChild(el('button',{class:'count-btn'+(state.mode==='cpu'?' active':''),text:t('tabCpu'),onclick:()=>{state.mode='cpu';render();}}));
+  modeRow.appendChild(el('button',{class:'count-btn'+(state.mode==='practice'?' active':''),text:t('tabPractice'),onclick:()=>{state.mode='practice';render();}}));
+  sec0.appendChild(modeRow);
+  const modeDesc = state.mode==='local' ? t('modeDescLocal')
+    : state.mode==='practice' ? t('modeDescPractice')
+    : t('modeDescCpu');
+  sec0.appendChild(el('div',{class:'setup-label',text:modeDesc, style:'margin-top:8px;'}));
+  card.appendChild(sec0);
+
+  const sec1=el('div',{class:'setup-section'});
+  sec1.appendChild(el('div',{class:'setup-label',text: state.mode==='local' ? t('playerCountLabel') : t('playerCountLabelCpu')}));
+  const row=el('div',{class:'count-row'});
+  for(let n=2;n<=5;n++) row.appendChild(el('button',{class:'count-btn'+(state.playerCount===n?' active':''),text:n+t('playerCountSuffix'),onclick:()=>{state.playerCount=n;render();}}));
+  sec1.appendChild(row); card.appendChild(sec1);
+
+  const sec2=el('div',{class:'setup-section'});
+  sec2.appendChild(el('div',{class:'setup-label',text: state.mode==='local' ? t('nameLabel') : t('nameLabelCpu')}));
+  const list=el('div',{class:'name-list'});
+  const nameCount = state.mode==='local' ? state.playerCount : 1;
+  for(let i=0;i<nameCount;i++){
+    const rowEl=el('div',{class:'name-row'});
+    rowEl.appendChild(el('div',{class:'name-badge',text:i+1}));
+    const input=el('input',{type:'text',placeholder: state.mode==='local' ? t('namePlaceholderPlayer',i+1) : t('namePlaceholderYou'),value:state.names[i]||''});
+    input.addEventListener('input',e=>{state.names[i]=e.target.value;});
+    rowEl.appendChild(input); list.appendChild(rowEl);
+  }
+  sec2.appendChild(list); card.appendChild(sec2);
+
+  card.appendChild(el('button',{class:'start-btn',text:t('startGameBtn'),onclick:startGame}));
+  if(isSelfMode()){
+    const s=state.learnedStats;
+    const total=s.leadSmall+s.leadBig+s.premiumHeld+s.premiumUsed;
+    card.appendChild(el('div',{class:'setup-label',text: total>0 ? t('learnedStatsWithData',total) : t('learnedStatsNoData'), style:'margin-top:14px;text-align:center;'}));
+    if(total>0){
+      card.appendChild(el('button',{class:'rules-link',text:t('resetLearnedStatsBtn'),onclick:()=>{resetLearnedStats();render();}}));
+    }
+  }
+  card.appendChild(el('button',{class:'rules-link',text:t('viewRulesBtn'),onclick:()=>{state.showRules=true;render();}}));
+  wrap.appendChild(card); root.appendChild(wrap);
+}
+
+function renderReveal(root){
+  const wrap=el('div',{class:'reveal-wrap'}); const box=el('div',{class:'reveal-box'});
+  const player=state.players[state.pendingIndex];
+  box.appendChild(el('div',{class:'who',text:t('nextPlayerLabel')}));
+  box.appendChild(el('div',{class:'name',text:player.name}));
+  box.appendChild(el('div',{class:'hint',text:t('revealHint')}));
+  box.appendChild(el('button',{class:'reveal-btn',text:t('revealBtn'),onclick:()=>{
+    state.currentIndex=state.pendingIndex; state.screen='play'; render();
+  }}));
+  wrap.appendChild(box); root.appendChild(wrap);
+}
+
+function analyzeHand(playerIndex){
+  const player=state.players[playerIndex];
+  const hand=player.hand;
+  const jokerCount=hand.filter(c=>c.rank==='JOKER').length;
+  const bySuit={};
+  hand.forEach(c=>{ if(c.suit) (bySuit[c.suit]=bySuit[c.suit]||[]).push(c); });
+
+  const straightFinds=[];
+  Object.entries(bySuit).forEach(([suit,cards])=>{
+    const idxs=[...new Set(cards.map(c=>RANKS.indexOf(c.rank)))].sort((a,b)=>a-b);
+    // maximal natural runs (no gap)
+    let run=[idxs[0]];
+    const flushRun=(run)=>{ if(run.length>=3) straightFinds.push({suit,ranks:run.map(i=>RANKS[i]),usesJoker:0}); };
+    for(let i=1;i<idxs.length;i++){
+      if(idxs[i]===idxs[i-1]+1) run.push(idxs[i]);
+      else { flushRun(run); run=[idxs[i]]; }
+    }
+    flushRun(run);
+    // near-miss runs fillable with available jokers (single gap only, kept simple)
+    if(jokerCount>=1){
+      for(let i=0;i<idxs.length-1;i++){
+        const gap=idxs[i+1]-idxs[i]-1;
+        if(gap>=1 && gap<=jokerCount){
+          const ranks=[]; for(let k=idxs[i];k<=idxs[i+1];k++) ranks.push(RANKS[k]);
+          if(ranks.length>=3) straightFinds.push({suit,ranks,usesJoker:gap});
+        }
+      }
+    }
+  });
+
+  const byRank={};
+  hand.forEach(c=>{ if(c.rank!=='JOKER') (byRank[c.rank]=byRank[c.rank]||[]).push(c); });
+  const revolutionSets=[];
+  Object.entries(byRank).forEach(([rank,cards])=>{
+    const total=cards.length+jokerCount;
+    if(total>=4 && cards.length>=2) revolutionSets.push({rank,have:cards.length,jokersNeeded:Math.max(0,4-cards.length)});
+  });
+  const revolutionStraights=straightFinds.filter(s=>s.ranks.length>=4);
+
+  const move=aiChooseMove(playerIndex);
+  let recommendation=null;
+  if(move){
+    const v=evaluateSelection(playerIndex, move.map(c=>c.id));
+    recommendation=v.ok?describePlay(v):null;
+  }
+
+  const activeOthers=state.players.filter((p,i)=>i!==playerIndex && !p.finished);
+  const someoneFinished=state.finishOrder.length>0;
+  const avgOthers=activeOthers.length ? activeOthers.reduce((s,p)=>s+p.hand.length,0)/activeOthers.length : hand.length;
+  let strategyNote;
+  if(someoneFinished && hand.length>avgOthers) strategyNote=t('strategyBehind');
+  else if(someoneFinished) strategyNote=t('strategyAhead');
+  else if(hand.length<=avgOthers-2) strategyNote=t('strategyLeading');
+  else strategyNote=t('strategyEarly');
+
+  return {straightFinds, revolutionSets, revolutionStraights, move, recommendation, strategyNote, jokerCount};
+}
+function renderHintPanel(){
+  const a=analyzeHand(0);
+  const box=el('div',{class:'hint-panel'});
+  box.appendChild(el('div',{class:'hint-panel-title',text:t('hintTitle')}));
+
+  if(a.straightFinds.length){
+    const uniq=[...new Map(a.straightFinds.map(s=>[s.suit+s.ranks.join(''),s])).values()];
+    const line=uniq.slice(0,4).map(s=> s.usesJoker>0 ? `${s.suit}${s.ranks.join('-')}${t('jokerUses',s.usesJoker)}` : `${s.suit}${s.ranks.join('-')}`).join(' / ');
+    box.appendChild(el('div',{class:'hint-panel-line',text:t('straightCandidates',line)}));
+  }
+  if(a.revolutionSets.length || a.revolutionStraights.length){
+    const parts=[];
+    a.revolutionSets.forEach(s=>parts.push(t('revSetPart',s.rank,s.have,s.jokersNeeded)));
+    a.revolutionStraights.forEach(s=>parts.push(t('revStraightPart',s.suit,s.ranks.join('-'))));
+    box.appendChild(el('div',{class:'hint-panel-line',text:t('revolutionPossibility',parts.join(' / '))}));
+  }
+  box.appendChild(el('div',{class:'hint-panel-line',text:a.strategyNote}));
+  if(a.recommendation && state.currentIndex===0 && state.screen==='play'){
+    box.appendChild(el('div',{class:'hint-panel-line strong',text:t('recommendedMove',a.recommendation)}));
+  }
+  return box;
+}
+function seatSlotForIndex(idx,n){
+  if(n<=4) return ['tl','tr','br','bl'][idx];
+  return ['tl','tc','tr','bl','br'][idx];
+}
+function buildLangSwitch(cls){
+  const row=el('div',{class:cls||'lang-switch'});
+  row.appendChild(el('button',{class:'lang-btn'+(state.lang==='ja'?' active':''), text:'日本語', onclick:()=>setLang('ja')}));
+  row.appendChild(el('button',{class:'lang-btn'+(state.lang==='en'?' active':''), text:'English', onclick:()=>setLang('en')}));
+  return row;
+}
+function renderTable(root){
+  const n=state.players.length;
+  const selfMode = state.mode==='cpu' || state.mode==='practice';
+  const selfIndex = selfMode ? 0 : state.currentIndex;
+  const actor=state.players[selfIndex];
+
+  root.appendChild(buildLangSwitch('game-lang-switch'));
+
+  const topbar=el('div',{class:'topbar'});
+  topbar.appendChild(el('div',{class:'title',text:t('roundTitle',state.roundNumber)}));
+  const badges=el('div',{class:'badge-row'});
+  badges.appendChild(el('button',{class:'top-rules-btn',text:t('rulesBtnShort'),onclick:()=>{state.showRules=true;render();}}));
+  if(state.revolutionCount>0) badges.appendChild(el('div',{class:'badge gold',text:t('revolutionBadge',state.revolutionCount,Math.pow(2,state.revolutionCount))}));
+  if(state.tempReversed) badges.appendChild(el('div',{class:'badge on',text:t('tempReversedBadge')}));
+  if(effectiveReversed()) badges.appendChild(el('div',{class:'badge on',text:t('reversedBadge')}));
+  if(state.lockSeq) badges.appendChild(el('div',{class:'badge on',text:t('gekiBadge',state.lockSeq.suits.join(''),state.lockSeq.rank)}));
+  else if(state.lockSuits) badges.appendChild(el('div',{class:'badge on',text:t('lockBadge',state.lockSuits.join(''))}));
+  topbar.appendChild(badges);
+  root.appendChild(topbar);
+
+  const arena=el('div',{class:'arena'});
+  const seatTargets = selfMode
+    ? state.players.map((p,i)=>({p,i})).filter(x=>x.i!==0)   // CPU/practice: corners are the CPUs only, you're always in the bottom panel
+    : state.players.map((p,i)=>({p,i})).filter(x=>x.i!==state.currentIndex); // local: corners are everyone except whoever's revealed right now
+  seatTargets.forEach(x=>{
+    const pos=seatSlotForIndex(x.i,n);
+    const cls=['seat',pos];
+    if(x.p.finished) cls.push('done');
+    if(x.i===state.currentIndex && !x.p.finished) cls.push('current');
+    const seat=el('div',{class:cls.join(' ')});
+    seat.appendChild(el('div',{class:'face',text:x.p.name.slice(0,1)}));
+    seat.appendChild(el('div',{class:'sname',text:x.p.name+(x.p.isCPU?' 🤖':'')}));
+    if(x.p.finished){
+      const pos2=state.finishOrder.indexOf(x.i);
+      const labels=rankLabels(state.players.length);
+      seat.appendChild(el('div',{class:'srank',text:labels[pos2]||t('finishedLabel')}));
+    } else {
+      seat.appendChild(miniHandFan(x.p.hand.length));
+    }
+    seat.appendChild(el('div',{class:'sscore',text:x.p.score+'pt'}));
+    arena.appendChild(seat);
+  });
+
+  const fieldZone=el('div',{class:'field-zone'});
+  if(state.lockSeq){
+    fieldZone.appendChild(el('div',{class:'lock-banner',text:t('gekiBanner',state.lockSeq.suits.join(''),state.lockSeq.rank,t('gekiShape',state.lockSeq.count))}));
+  } else if(state.lockSuits){
+    fieldZone.appendChild(el('div',{class:'lock-banner',text:t('lockBanner',state.lockSuits.join('/'))}));
+  }
+  if(state.field===null){
+    fieldZone.appendChild(el('div',{class:'field-empty',text:t('fieldEmpty')}));
+  } else {
+    const fc=el('div',{class:'field-cards'});
+    const playEntries=state.trickHistory.filter(h=>h.kind==='play');
+    const visible=playEntries.slice(-8);
+    const activeIdx=visible.length-1;
+    visible.forEach((entry,i)=>fc.appendChild(pileCluster(entry,i,activeIdx)));
+    fieldZone.appendChild(fc);
+    if(state.trickHistory.length){
+      const logRow=el('div',{class:'trick-log'});
+      state.trickHistory.forEach(h=>{
+        const label=h.kind==='pass' ? t('passChip',h.name) : `${h.name}: ${describePlay(h)}`;
+        logRow.appendChild(el('div',{class:'trick-chip'+(h.kind==='pass'?' pass':''),text:label}));
+      });
+      fieldZone.appendChild(logRow);
+    }
+  }
+  fieldZone.appendChild(el('div',{class:'log-line',text:state.log}));
+  arena.appendChild(fieldZone);
+  root.appendChild(arena);
+
+  if(state.mode==='practice') root.appendChild(renderHintPanel());
+
+  const panel=el('div',{class:'hand-panel'});
+  const isMyTurnNow = state.screen==='play' && state.currentIndex===selfIndex;
+
+  if(state.screen==='give' || state.screen==='discard'){
+    const gActor=state.players[state.pendingActor];
+    const label=state.screen==='give' ? t('giveLabel') : t('discardLabel');
+    panel.appendChild(el('div',{class:'hint-line',text:`${label}${t('selCount',state.selected.size,state.pendingCount)}`}));
+    const hrow=buildFanRow(gActor.hand, card=>({selected:state.selected.has(card.id),onClick:()=>toggleSelect(card.id),draggable:true}));
+    panel.appendChild(hrow);
+    const ar=el('div',{class:'action-row'});
+    ar.appendChild(el('button',{class:'btn play',text:t('confirmBtn'),disabled:state.selected.size===state.pendingCount?null:'disabled',onclick:confirmGiveDiscard}));
+    panel.appendChild(ar);
+  } else {
+    const head=el('div',{class:'hand-head'});
+    const titleText = isMyTurnNow ? t('handTitleTurn',actor.name,actor.hand.length)
+      : selfMode ? t('handTitle',actor.name,actor.hand.length) : t('handTitleTurn',actor.name,actor.hand.length);
+    head.appendChild(el('div',{class:'htitle',text:titleText}));
+    head.appendChild(el('div',{class:'hscore',text:actor.score+'pt'}));
+    panel.appendChild(head);
+    const hrow=buildFanRow(actor.hand, card=> isMyTurnNow
+      ? {selected:state.selected.has(card.id),onClick:()=>toggleSelect(card.id),draggable:true}
+      : {draggable:true});
+    panel.appendChild(hrow);
+
+    if(!isMyTurnNow && selfMode){
+      panel.appendChild(el('div',{class:'hint-line',text:t('cpuThinking',state.players[state.currentIndex].name)}));
+      scheduleCPU();
+    } else {
+      const v=evaluateSelection(selfIndex,[...state.selected]);
+      let hint='';
+      if(state.selected.size>0){
+        if(v.ok){
+          const foulCheck=evaluateFoulFinish(v, state.players[selfIndex].hand);
+          if(foulCheck.isFoul) hint=t('foulWarning');
+          else hint=t('canPlay',describePlay(v));
+        } else hint=t('cannotPlay');
+      }
+      panel.appendChild(el('div',{class:'hint-line',text:hint}));
+      const ar=el('div',{class:'action-row'});
+      ar.appendChild(el('button',{class:'btn play',text:t('play'),disabled:v.ok?null:'disabled',onclick:playSelected}));
+      ar.appendChild(el('button',{class:'btn pass',text:t('pass'),disabled:state.field===null?'disabled':null,onclick:passTurn}));
+      ar.appendChild(el('button',{class:'btn clear',text:t('clearSel'),onclick:clearSelection}));
+      panel.appendChild(ar);
+      panel.appendChild(el('div',{class:'hint-line',text:t('dragHint')}));
+    }
+  }
+  root.appendChild(panel);
+}
+
+function rankLabels(n){
+  const L=t('rankLabels');
+  if(n<=1) return [L.daifugo];
+  if(n===2) return [L.daifugo,L.daihinmin];
+  if(n===3) return [L.daifugo,L.heimin,L.daihinmin];
+  const labels=[L.daifugo,L.fugo];
+  for(let i=0;i<n-4;i++) labels.push(L.heimin);
+  labels.push(L.hinmin,L.daihinmin);
+  return labels;
+}
+function translateFoulReason(reason){
+  if(state.lang!=='en' || !reason) return reason;
+  const known={
+    '7渡し':'Seven Give', '10捨て':'Ten Discard',
+    'joker_finish':'finishing with a Joker', 'eight_finish':'finishing with an 8',
+    'normal_2_finish':'finishing with a 2', 'revolution_3_finish':'finishing with a 3',
+    '禁止上がり':'illegal finish',
+  };
+  let s=reason;
+  Object.keys(known).forEach(k=>{ s=s.split(k).join(known[k]); });
+  return s.split('・').join(', ');
+}
+function renderResult(root){
+  const wrap=el('div',{class:'result-wrap'}); const card=el('div',{class:'result-card'});
+  card.appendChild(buildLangSwitch());
+  card.appendChild(el('h2',{text:t('resultTitle',state.roundNumber)}));
+  const hasFouls = state.pendingFoulPenalties && state.pendingFoulPenalties.length>0;
+  if(hasFouls){
+    card.appendChild(el('div',{class:'result-sub',text:t('foulTotalAdded',state.lastRoundPoints)}));
+    state.pendingFoulPenalties.forEach(fp=>{
+      const name=state.players[fp.playerId].name;
+      card.appendChild(el('div',{class:'result-sub',text:t('foulLine',name,translateFoulReason(fp.reason),fp.penaltyPoints,fp.rateAfter),style:'color:#e08a8a;'}));
+    });
+  } else {
+    card.appendChild(el('div',{class:'result-sub',text:t('pointsExchanged',state.lastRoundPoints)}));
+  }
+  const list=el('div',{class:'rank-list'});
+  const labels=rankLabels(state.players.length);
+  // 反則者ごとのPtを直接引けるようマップ化(反則者本人の損失=その額そのまま。合算や折半は行わない)
+  const foulPtByPlayer={};
+  if(hasFouls) state.pendingFoulPenalties.forEach(fp=>{ foulPtByPlayer[fp.playerId]=fp.penaltyPoints; });
+  state.finishOrder.forEach((idx,pos)=>{
+    const p=state.players[idx];
+    const row=el('div',{class:'rank-row'});
+    row.appendChild(el('div',{class:'num',text:(pos+1)+'.'}));
+    row.appendChild(el('div',{class:'rname',text:p.name}));
+    row.appendChild(el('div',{class:'rtitle',text:labels[pos]}));
+    let pt=0;
+    if(foulPtByPlayer[idx]!==undefined){
+      pt=-foulPtByPlayer[idx]; // 反則者本人はその反則Ptをそのままマイナス表示(合算・折半なし)
+    } else if(pos===0){
+      pt=state.lastRoundPoints; // 大富豪: 通常勝利分、または反則Pt合計の加算分をそのまま表示
+    } else if(!hasFouls && pos===state.finishOrder.length-1){
+      pt=-state.lastRoundPoints; // 反則が絡まない通常ラウンドの最下位のみマイナス
+    }
+    const ptEl=el('div',{class:'rpt '+(pt>0?'pos':pt<0?'neg':'')});
+    ptEl.textContent=(pt>0?'+':'')+pt;
+    row.appendChild(ptEl);
+    row.appendChild(el('div',{class:'rtotal',text:t('totalPt',p.score)}));
+    list.appendChild(row);
+  });
+  card.appendChild(list);
+  card.appendChild(el('div',{class:'result-sub',text:t('nextRoundQ'),style:'margin-top:18px;margin-bottom:0;'}));
+  const btns=el('div',{class:'result-btns'});
+  btns.appendChild(el('button',{class:'btn play',text:t('yesNextRound'),onclick:startNextRound}));
+  btns.appendChild(el('button',{class:'btn pass',text:t('noEndHere'),onclick:resetGame}));
+  card.appendChild(btns);
+  wrap.appendChild(card); root.appendChild(wrap);
+}
+
+function renderRulesModal(root){
+  const back=el('div',{class:'modal-back',onclick:(e)=>{ if(e.target===back){state.showRules=false;render();} }});
+  const box=el('div',{class:'modal-box'});
+  box.appendChild(buildLangSwitch());
+  box.appendChild(el('h3',{text:t('rulesTitle')}));
+  const basics=el('ul');
+  t('rulesBasics').forEach(x=>basics.appendChild(el('li',{text:x})));
+  box.appendChild(basics);
+
+  box.appendChild(el('h4',{text:t('rulesEffectsTitle')}));
+  const eff=el('ul');
+  t('rulesEffects').forEach(x=>eff.appendChild(el('li',{text:x})));
+  box.appendChild(eff);
+
+  box.appendChild(el('h4',{text:t('rulesJokerTitle')}));
+  const jk=el('ul');
+  t('rulesJoker').forEach(x=>jk.appendChild(el('li',{text:x})));
+  box.appendChild(jk);
+
+  box.appendChild(el('h4',{text:t('rulesForbiddenTitle')}));
+  const forb=el('ul');
+  t('rulesForbidden').forEach(x=>forb.appendChild(el('li',{text:x})));
+  box.appendChild(forb);
+
+  box.appendChild(el('h4',{text:t('rulesScoreTitle')}));
+  const pt=el('ul');
+  t('rulesScore').forEach(x=>pt.appendChild(el('li',{text:x})));
+  box.appendChild(pt);
+
+  box.appendChild(el('h4',{text:t('rulesAfterFinishTitle')}));
+  const afterFinish=el('ul');
+  t('rulesAfterFinish').forEach(x=>afterFinish.appendChild(el('li',{text:x})));
+  box.appendChild(afterFinish);
+
+  box.appendChild(el('h4',{text:t('rulesOtherTitle')}));
+  const other=el('ul');
+  t('rulesOther').forEach(x=>other.appendChild(el('li',{text:x})));
+  box.appendChild(other);
+
+  box.appendChild(el('div',{class:'note',text:t('rulesNote')}));
+  box.appendChild(el('button',{class:'modal-close',text:t('closeRules'),onclick:()=>{state.showRules=false;render();}}));
+  back.appendChild(box); root.appendChild(back);
+}
+
+function buildJokerChoiceLabel(choice){
+  const parts=choice.assignment.map(a => a.rank==='JOKER' ? 'JOKER' : `${a.suit||''}${a.rank}`);
+  return t('jokerAs', parts.join('・'));
+}
+function renderJokerChoiceModal(root){
+  const back=el('div',{class:'modal-back'});
+  const box=el('div',{class:'modal-box joker-choice-modal'});
+  box.appendChild(el('h3',{text:t('jokerModalTitle')}));
+  const list=el('div',{class:'joker-choice-list'});
+  state.pendingJokerChoices.forEach(choice=>{
+    list.appendChild(el('button',{class:'joker-choice-btn', text:buildJokerChoiceLabel(choice), onclick:()=>confirmJokerChoice(choice)}));
+  });
+  box.appendChild(list);
+  box.appendChild(el('button',{class:'btn pass joker-cancel-btn', text:t('jokerCancel'), onclick:cancelJokerChoice}));
+  back.appendChild(box);
+  root.appendChild(back);
+}
+
+function render(){
+  const root=document.getElementById('app'); root.innerHTML='';
+  if(state.screen==='setup') renderSetup(root);
+  else if(state.screen==='reveal') renderReveal(root);
+  else if(state.screen==='result') renderResult(root);
+  else renderTable(root);
+  if(state.showRules) renderRulesModal(root);
+  if(state.pendingJokerChoices) renderJokerChoiceModal(root);
+}
+render();
+</script>
+</body>
+</html>

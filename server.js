@@ -54,6 +54,64 @@ function findPlayer(room, id, token) {
   return p;
 }
 
+/* ============================================================
+   接続状態の管理・AFK(放置)自動進行
+   ============================================================ */
+const POLL_STALE_MS = 6000;   // これだけpollが来なければ「切断」とみなして表示する
+const AFK_TIMEOUT_MS = 20000; // これだけ操作がなければ、そのプレイヤーの手番を自動で進める
+
+function updateConnectionStatus(room) {
+  const now = Date.now();
+  room.players.forEach(p => { p.connected = (now - p.lastPoll) < POLL_STALE_MS; });
+}
+
+// 手番のプレイヤーが長時間操作していない場合、ゲームが止まったままにならないよう自動で進める。
+// パスできる場面ではパス、リード(場が空)の場面では出せる中で最も弱い手を出す。
+function autoAdvanceIfAfk(room) {
+  if (room.phase !== 'playing' || !room.gs) return;
+  updateConnectionStatus(room);
+  const gs = room.gs;
+  const now = Date.now();
+  const isAfk = (idx) => {
+    const p = room.players[idx];
+    return p && (now - p.lastPoll) >= AFK_TIMEOUT_MS;
+  };
+
+  let guard = 0; // 連続してAFK進行が起きても無限ループにならないようにする安全弁
+  while (guard < 20) {
+    guard++;
+    if (gs.phase === 'playing') {
+      const idx = gs.currentIndex;
+      if (!isAfk(idx)) break;
+      if (gs.field !== null) {
+        engine.passTurn(gs, idx);
+      } else {
+        const hand = gs.players[idx].hand;
+        let played = false;
+        for (const c of hand) {
+          if (engine.playCards(gs, idx, [c.id]).ok) { played = true; break; }
+        }
+        if (!played) {
+          const candidates = engine.generateCandidates(hand);
+          for (const arr of candidates) {
+            if (engine.playCards(gs, idx, arr.map(c => c.id)).ok) { played = true; break; }
+          }
+        }
+        if (!played) break; // 万一出せる手が見つからない場合は何もしない(通常起こらない)
+      }
+    } else if (gs.phase === 'give' || gs.phase === 'discard') {
+      const idx = gs.pendingActor;
+      if (!isAfk(idx)) break;
+      const need = gs.pendingCount;
+      const ids = gs.players[idx].hand.slice(0, need).map(c => c.id);
+      engine.confirmGiveDiscard(gs, idx, ids);
+    } else {
+      break; // 'result' 等はAFK進行の対象外
+    }
+    if (gs.phase === 'result') break;
+  }
+}
+
 function serializeForPlayer(room, viewerId) {
   const base = {
     roomCode: room.code,
@@ -89,6 +147,7 @@ function serializeForPlayer(room, viewerId) {
     fouled: p.fouled,
     handCount: p.hand.length,
     hand: i === viewerId ? p.hand : undefined,
+    connected: room.players[i] ? room.players[i].connected : true,
   }));
   return base;
 }
@@ -163,6 +222,7 @@ const server = http.createServer(async (req, res) => {
     const player = findPlayer(room, playerId, token);
     if (!player) return sendJson(res, 403, { error: 'bad_token' });
     player.connected = true; player.lastPoll = Date.now();
+    autoAdvanceIfAfk(room);
     return sendJson(res, 200, serializeForPlayer(room, playerId));
   }
 
@@ -194,9 +254,12 @@ const server = http.createServer(async (req, res) => {
       const player = findPlayer(room, playerId, token);
       if (!player) return sendJson(res, 403, { error: 'bad_token' });
       touchRoom(room);
+      player.connected = true; player.lastPoll = Date.now();
+      autoAdvanceIfAfk(room); // 自分より前に他の誰かがAFKで止まっていないか、先に進めておく
 
       const result = handleAction(room, playerId, action || {});
       if (result && result.error) return sendJson(res, 400, { error: result.error });
+      autoAdvanceIfAfk(room); // 自分のアクションの結果、次の手番がAFKなら続けて進める
       return sendJson(res, 200, serializeForPlayer(room, playerId));
     } catch (e) {
       return sendJson(res, 500, { error: 'server_error', detail: String(e && e.message || e) });

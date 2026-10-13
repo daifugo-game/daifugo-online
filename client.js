@@ -11,7 +11,7 @@ const I18N = {
     overview:'【大富豪オンライン対戦】\n\n友達とリアルタイムで遊べる、大富豪のオンライン対戦ゲームです。\n\n順番にカードを出して、ほかのプレイヤーより早く手札をなくすことを目指します。\n\n通常の大富豪に加えて、革命・縛り・激縛り・8切り・7渡し・10捨て・Jバック・5飛び・6ロック・スペ3返し・JOKER選択などの特殊ルールがあります。\n\n詳しいルールは「詳しいルールを見る」から確認できます。',
     viewRules:'詳しいルールを見る', closeRules:'閉じる',
     enterRoomCode:'ルームコードを入力してください', defaultHostName:'ホスト',
-    lobbyTitle:'ロビー', copyLink:'リンクをコピー', host:'ホスト', online:'接続中', offline:'切断',
+    lobbyTitle:'ロビー', copyLink:'リンクをコピー', host:'ホスト', online:'接続中', offline:'切断', leaveRoom:'ルームを退出', confirmLeave:'ルームを退出しますか?途中経過は失われます。',
     needMorePlayers:'あと1人以上必要です', startGame:n=>`ゲームを始める(${n}人)`, waitingHost:'ホストが開始するのを待っています…',
     loading:'読み込み中…',
     roundTitle:(n,room)=>`大富豪 - ラウンド${n} (ルーム ${room})`,
@@ -29,7 +29,8 @@ const I18N = {
     jokerModalTitle:'JOKERを何として使いますか?', jokerCancel:'キャンセル(選び直す)', jokerAs:(...s)=>`JOKER→${s.join('・')}`,
     straightSuffix:'の階段', passChip:name=>`${name}: パス`,
     resultTitle:n=>`ラウンド${n} 結果`, pointsExchanged:pt=>`やり取りポイント: ${pt}pt`,
-    foulLine:(name,reason,amount)=>`⚠️ ${name} が${reason}を果たせず反則負け(追加で-${amount}pt)`,
+    pointsExchangedFoul:pt=>`反則Ptの合計 ${pt}pt が大富豪へ加算されました`,
+    foulLine:(name,reason,amount,rate)=>`⚠️ ${name} が${reason}で反則(-${amount}pt, レート${rate}倍)`,
     rankLabels:{daifugo:'大富豪', fugo:'富豪', heimin:'平民', hinmin:'貧民', daihinmin:'大貧民'},
     totalPt:n=>`累計${n}pt`, nextRoundQ:'次のラウンドに進みますか?',
     yesNextRound:'はい、次のラウンドへ', backToLobby:'ロビーに戻る', waitingNextRound:'ホストが次のラウンドを開始するのを待っています…',
@@ -78,7 +79,7 @@ const I18N = {
     overview:'【Online Daifugo】\n\nA real-time online version of Daifugo (also known as President) that you can play with friends.\n\nTake turns playing cards and try to get rid of your entire hand before the other players.\n\nThis version includes special rules such as Revolution, Suit Lock, Strong Suit Lock, Eight Cut, Seven Give, Ten Discard, Jack Back, Five Skip, Six Lock, the 3 of Spades counter, and Joker selection.\n\nSee "View Detailed Rules" for the complete rules.',
     viewRules:'View Detailed Rules', closeRules:'Close',
     enterRoomCode:'Please enter a room code', defaultHostName:'Host',
-    lobbyTitle:'Lobby', copyLink:'Copy Link', host:'Host', online:'Online', offline:'Offline',
+    lobbyTitle:'Lobby', copyLink:'Copy Link', host:'Host', online:'Online', offline:'Offline', leaveRoom:'Leave Room', confirmLeave:'Leave this room? Your progress will be lost.',
     needMorePlayers:'Need at least 1 more player', startGame:n=>`Start Game (${n} players)`, waitingHost:'Waiting for the host to start…',
     loading:'Loading…',
     roundTitle:(n,room)=>`Daifugo - Round ${n} (Room ${room})`,
@@ -96,7 +97,8 @@ const I18N = {
     jokerModalTitle:'What should the Joker represent?', jokerCancel:'Cancel (choose again)', jokerAs:(...s)=>`JOKER→${s.join('・')}`,
     straightSuffix:' straight', passChip:name=>`${name}: Pass`,
     resultTitle:n=>`Round ${n} Results`, pointsExchanged:pt=>`Points exchanged: ${pt}pt`,
-    foulLine:(name,reason,amount)=>`⚠️ ${name} could not complete ${reason} — illegal finish (extra -${amount}pt)`,
+    pointsExchangedFoul:pt=>`A total of ${pt}pt from illegal finishes was added to the President`,
+    foulLine:(name,reason,amount,rate)=>`⚠️ ${name} committed an illegal finish (${reason}) — -${amount}pt (rate ×${rate})`,
     rankLabels:{daifugo:'President', fugo:'Vice President', heimin:'Citizen', hinmin:'Poor', daihinmin:'Beggar'},
     totalPt:n=>`Total: ${n}pt`, nextRoundQ:'Proceed to the next round?',
     yesNextRound:'Yes, Next Round', backToLobby:'Back to Lobby', waitingNextRound:'Waiting for the host to start the next round…',
@@ -178,6 +180,25 @@ const app = {
 };
 app.lang = loadLang();
 
+/* ---------- セッション永続化(リロード後の再接続) ---------- */
+function saveSession(){
+  try{
+    if(app.me) localStorage.setItem('daifugoSession', JSON.stringify(app.me));
+  }catch(e){}
+}
+function loadSession(){
+  try{
+    const v = localStorage.getItem('daifugoSession');
+    if(!v) return null;
+    const parsed = JSON.parse(v);
+    if(parsed && parsed.roomCode && parsed.token && typeof parsed.playerId==='number') return parsed;
+  }catch(e){}
+  return null;
+}
+function clearSession(){
+  try{ localStorage.removeItem('daifugoSession'); }catch(e){}
+}
+
 const params = new URLSearchParams(location.search);
 if(params.get('room')){ app.roomCodeInput = params.get('room').toUpperCase(); app.tab='join'; }
 
@@ -214,7 +235,15 @@ async function poll(){
   if(!app.me) return;
   try{
     const st = await apiGet(`/api/state?roomCode=${app.me.roomCode}&playerId=${app.me.playerId}&token=${app.me.token}`);
-    if(st.error){ app.error = describeError(st.error); }
+    if(st.error){
+      app.error = describeError(st.error);
+      if(st.error==='no_room' || st.error==='bad_token'){
+        // ルームが失効/無効化された場合は、詰まらないようセッションを破棄してトップ画面へ戻す
+        clearSession();
+        if(app.pollTimer) clearInterval(app.pollTimer);
+        app.me = null; app.server = null; app.screen = 'landing';
+      }
+    }
     else {
       app.server = st;
       app.screen = st.phase === 'lobby' ? 'lobby' : 'game';
@@ -235,6 +264,7 @@ async function createRoom(){
   const res = await apiPost('/api/create', {name: app.nameInput.trim() || t('defaultHostName')});
   if(res.error){ app.error = res.error; render(); return; }
   app.me = {roomCode: res.roomCode, playerId: res.playerId, token: res.token};
+  saveSession();
   history.replaceState(null,'', '?room='+res.roomCode);
   startPolling();
 }
@@ -245,9 +275,27 @@ async function joinRoom(){
   const res = await apiPost('/api/join', {roomCode: code, name: app.nameInput.trim() || undefined});
   if(res.error){ app.error = describeError(res.error) || res.error; render(); return; }
   app.me = {roomCode: res.roomCode, playerId: res.playerId, token: res.token};
+  saveSession();
   history.replaceState(null,'', '?room='+res.roomCode);
   startPolling();
 }
+function leaveRoom(){
+  if(app.pollTimer) clearInterval(app.pollTimer);
+  clearSession();
+  app.me = null; app.server = null; app.screen = 'landing'; app.error='';
+  history.replaceState(null,'', location.pathname);
+  render();
+}
+
+/* ---------- 起動時の自動復帰 ---------- */
+(function tryRestoreSession(){
+  const saved = loadSession();
+  if(saved){
+    app.me = saved;
+    app.screen = 'game'; // stateが届くまでの暫定画面。pollが最新phaseへ補正する
+    startPolling();
+  }
+})();
 
 /* ---------- DOM helpers ---------- */
 function el(tag, attrs={}, children=[]){
@@ -440,6 +488,7 @@ function renderLobby(root){
   }
   if(app.error) card.appendChild(el('div',{class:'error-msg', text:app.error}));
   card.appendChild(el('button',{class:'rules-link-btn', text:t('viewRules'), onclick:()=>{ app.showRules=true; render(); }}));
+  card.appendChild(el('button',{class:'rules-link-btn', text:t('leaveRoom'), onclick:()=>{ if(confirm(t('confirmLeave'))) leaveRoom(); }}));
   wrap.appendChild(card); root.appendChild(wrap);
 }
 
@@ -471,7 +520,10 @@ function renderGame(root){
     const cls = ['seat',pos]; if(p.finished) cls.push('done'); if(i===st.currentIndex && !p.finished) cls.push('current');
     const seat = el('div',{class:cls.join(' ')});
     seat.appendChild(el('div',{class:'face', text:p.name.slice(0,1)}));
-    seat.appendChild(el('div',{class:'sname', text:p.name}));
+    const nameRow = el('div',{class:'sname'});
+    nameRow.appendChild(el('span',{text:p.name}));
+    if(p.connected===false && !p.finished) nameRow.appendChild(el('span',{class:'disconnected-mark', text:' 💤', title:t('offline')}));
+    seat.appendChild(nameRow);
     if(p.finished){
       const pos2 = st.finishOrder.indexOf(i);
       seat.appendChild(el('div',{class:'srank', text: rankLabels(n)[pos2] || '完了'}));
@@ -635,12 +687,21 @@ function renderResult(root, st){
   const card = el('div',{class:'result-card'});
   card.appendChild(buildLangSwitch());
   card.appendChild(el('h2',{text:t('resultTitle', st.roundNumber)}));
-  card.appendChild(el('div',{class:'result-sub', text:t('pointsExchanged', st.lastRoundPoints)}));
-  if(st.foulPenalty){
-    card.appendChild(el('div',{class:'result-sub', text:t('foulLine', st.foulPenalty.name, translateFoulReason(st.foulPenalty.reason), st.foulPenalty.amount), style:'color:#e08a8a;'}));
+  const hasFouls = st.pendingFoulPenalties && st.pendingFoulPenalties.length>0;
+  if(hasFouls){
+    card.appendChild(el('div',{class:'result-sub', text:t('pointsExchangedFoul', st.lastRoundPoints)}));
+    st.pendingFoulPenalties.forEach(fp=>{
+      const name = st.players[fp.playerId].name;
+      card.appendChild(el('div',{class:'result-sub', text:t('foulLine', name, translateFoulReason(fp.reason), fp.penaltyPoints, fp.rateAfter), style:'color:#e08a8a;'}));
+    });
+  } else {
+    card.appendChild(el('div',{class:'result-sub', text:t('pointsExchanged', st.lastRoundPoints)}));
   }
   const list = el('div',{class:'rank-list'});
   const labels = rankLabels(st.players.length);
+  // 反則者ごとのPtを直接引けるようマップ化(反則者本人の損失=その額そのまま。合算や折半は行わない)
+  const foulPtByPlayer = {};
+  if(hasFouls) st.pendingFoulPenalties.forEach(fp=>{ foulPtByPlayer[fp.playerId]=fp.penaltyPoints; });
   st.finishOrder.forEach((idx,pos)=>{
     const p = st.players[idx];
     const row = el('div',{class:'rank-row'});
@@ -648,8 +709,13 @@ function renderResult(root, st){
     row.appendChild(el('div',{class:'rname', text:p.name}));
     row.appendChild(el('div',{class:'rtitle', text:labels[pos]}));
     let pt=0;
-    if(pos===0) pt=st.lastRoundPoints;
-    else if(pos===st.finishOrder.length-1){ pt=-st.lastRoundPoints; if(st.foulPenalty && st.foulPenalty.name===p.name) pt-=st.foulPenalty.amount; }
+    if(foulPtByPlayer[idx]!==undefined){
+      pt=-foulPtByPlayer[idx]; // 反則者本人はその反則Ptをそのままマイナス表示(合算・折半なし)
+    } else if(pos===0){
+      pt=st.lastRoundPoints; // 大富豪: 通常勝利分、または反則Pt合計の加算分をそのまま表示
+    } else if(!hasFouls && pos===st.finishOrder.length-1){
+      pt=-st.lastRoundPoints; // 反則が絡まない通常ラウンドの最下位のみマイナス
+    }
     const ptEl = el('div',{class:'rpt '+(pt>0?'pos':pt<0?'neg':'')}); ptEl.textContent=(pt>0?'+':'')+pt;
     row.appendChild(ptEl);
     row.appendChild(el('div',{class:'rtotal', text:t('totalPt', p.score)}));

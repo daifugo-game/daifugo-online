@@ -278,6 +278,10 @@ function advance(gs, fromIndex, { tobiSteps = 1 } = {}) {
     gs.currentIndex = ownerActive ? owner : i;
   } else {
     while (i !== owner && gs.passedThisField.has(i)) i = nextActiveRaw(gs, i);
+    if (ownerActive && i === owner) {
+      // 5飛び等で誰も出さずに場の所有者へ戻った → 自動で場を流し、所有者が親になる
+      clearFieldStateKeepScore(gs);
+    }
     gs.currentIndex = i;
   }
   gs.selected = [];
