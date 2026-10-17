@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>大富豪 オンライン</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap" rel="stylesheet">
@@ -227,7 +227,17 @@
   .joker-choice-btn{font-size:14px;padding:13px 10px;}
   .rules-modal-box{padding:16px 14px 28px;}
 }
+
+  /* ダブルタップ/ダブルクリックによる拡大・テキスト選択を防止 */
+  html,body{touch-action:manipulation;-webkit-touch-callout:none;-webkit-text-size-adjust:100%;}
+  body{-webkit-user-select:none;user-select:none;}
+  input,textarea{-webkit-user-select:text;user-select:text;}
 </style>
+<script>
+/* ピンチ/ダブルクリックによる拡大を防止(連続タップは妨げない) */
+document.addEventListener('dblclick',function(e){e.preventDefault();});
+['gesturestart','gesturechange','gestureend'].forEach(function(t){document.addEventListener(t,function(e){e.preventDefault();});});
+</script>
 </head>
 <body>
 <div id="app"></div>
