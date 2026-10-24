@@ -258,6 +258,10 @@ const I18N={
     startGameBtn:'ゲームを始める',
     learnedStatsWithData:n=>`CPUはこれまでの対戦(${n}回の判断)からあなたの出し方の傾向を学習しています`,
     learnedStatsNoData:'CPUはこれから対戦するたびにあなたの出し方の傾向を学習します',
+    cpuLevelLabel:'CPUの強さ', cpuLevelEasy:'やさしい', cpuLevelNormal:'ふつう', cpuLevelStrong:'つよい',
+    cpuLevelDesc_easy:'ときどき最善でない手を選びます。大富豪に慣れていない方向け。',
+    cpuLevelDesc_normal:'反則を避けながら、手札の整理と強さを意識して打ちます。',
+    cpuLevelDesc_strong:'相手の手札を予想しながら、最後まで先読みして最善手を選びます(考える時間が少し長くなります)。',
     resetLearnedStatsBtn:'学習データをリセット', viewRulesBtn:'ルールを見る',
     nextPlayerLabel:'次のプレイヤー', revealHint:'他の人は画面を見ないでください。準備ができたらタップして手札を確認します。', revealBtn:'手札を見る',
     hintTitle:'🎓 ヒント',
@@ -350,6 +354,10 @@ const I18N={
     startGameBtn:'Start Game',
     learnedStatsWithData:n=>`The CPU has learned your play style from ${n} past decisions.`,
     learnedStatsNoData:'The CPU will learn your play style as you play more games.',
+    cpuLevelLabel:'CPU level', cpuLevelEasy:'Easy', cpuLevelNormal:'Normal', cpuLevelStrong:'Strong',
+    cpuLevelDesc_easy:'Sometimes picks a non-optimal move. Good for beginners.',
+    cpuLevelDesc_normal:'Avoids fouls and plays sensibly by hand organization and card strength.',
+    cpuLevelDesc_strong:'Estimates opponents\' hidden hands and looks ahead to the end of the round (thinks a bit longer).',
     resetLearnedStatsBtn:'Reset Learning Data', viewRulesBtn:'View Rules',
     nextPlayerLabel:'Next Player', revealHint:"Everyone else, please look away. Tap when you're ready to check your hand.", revealBtn:'Show My Hand',
     hintTitle:'🎓 Hints',
@@ -463,6 +471,7 @@ const state={
   pendingFoulPlayCount:0, lastPlayHadJoker:false,
   pendingJokerChoices:null,
   pendingJokerCardIds:null,
+  cpuLevel:(function(){try{const v=localStorage.getItem('daifugoCpuLevel'); if(v==='easy'||v==='normal'||v==='strong') return v;}catch(e){} return 'strong';})(),
 };
 
 function effectiveReversed(){ return (state.revolutionCount%2===1)!==state.tempReversed; }
@@ -1200,8 +1209,9 @@ function candidateHasSafeInterpretation(idx, arr, v){
     if(totalN>0){
       const ids=new Set(arr.map(c=>c.id));
       const remaining=player.hand.filter(c=>!ids.has(c.id));
-      if(remaining.length>0 && remaining.length<=totalN &&
-         arr.some(c=>c.rank==='JOKER')) return false;
+      // 渡す/捨てるカードが足りず途中で反則になる(0<残り<必要枚数)出し方は常に避ける
+      if(remaining.length>0 && remaining.length<totalN) return false;
+      if(remaining.length>0 && remaining.length<=totalN && arr.some(c=>c.rank==='JOKER')) return false;
     }
     return true; // 上がりでなければ反則対象外
   }
@@ -1213,7 +1223,7 @@ function candidateHasSafeInterpretation(idx, arr, v){
   if(legal.length===0) return !wouldFoulFinish(v, player.hand.length); // 純JOKER等、選択肢が無い場合はデフォルト評価にフォールバック
   return legal.some(cand=>!evaluateFoulFinish(cand.evalResult, player.hand).isFoul);
 }
-function aiChooseMove(idx){
+function aiChooseMoveHeuristic(idx, opts){
   const player=state.players[idx];
   const raw=[...generateCandidates(player.hand), ...generateJokerCombinedCandidates(player.hand)];
   const allOk=raw.map(arr=>({arr,v:evaluateSelection(idx,arr.map(c=>c.id))})).filter(x=>x.v.ok);
@@ -1264,6 +1274,10 @@ function aiChooseMove(idx){
     if(remaining.length===2 && safeCards.length===0) risk += 200; // 残り2枚とも危険牌の状態も強めに回避
     const loneEffectRanks=remaining.filter(c=>c.rank==='7'||c.rank==='10');
     if(loneEffectRanks.length>0 && remaining.length<=2) risk += 80*loneEffectRanks.length; // 7/10を最後まで残すと未完遂上がりになりやすい
+    // 最後の1枚が7/10だと、自分が親になった瞬間に出せるのが反則手だけになる(パス不可)ため強く避ける
+    if(remaining.length===1 && (remaining[0].rank==='7'||remaining[0].rank==='10')) risk += 420;
+    // 2枚残りで7/10が含まれ、もう1枚では渡す/捨てる枚数を満たせない(同ランク2枚組など)状態も避ける
+    if(remaining.length===2 && remaining[0].rank===remaining[1].rank && (remaining[0].rank==='7'||remaining[0].rank==='10')) risk += 300;
     // このプレイでJOKERを使わず温存した場合、今が安全に消化できる貴重な機会なら機会損失として加点
     const usesJoker=arr.some(c=>c.rank==='JOKER');
     if(!usesJoker && jokerSafeOpportunityNow && remaining.some(c=>c.rank==='JOKER') && myHandSize<=8) risk += 110;
@@ -1327,6 +1341,7 @@ function aiChooseMove(idx){
   shortlist.sort((a,b)=>refinedScore(a.v,a.arr)-refinedScore(b.v,b.arr));
   candidates=shortlist.concat(candidates.slice(TOP_K));
   const best=candidates[0];
+  if(opts && opts.topK) return candidates.slice(0,opts.topK).map(x=>x.arr); // モンテカルロ探索用: 上位候補のリストを返す
 
   if(state.field!==null && usesPremiumCheck(best.v) && !dangerNearby && !trailing){
     const holdProb=Math.min(0.9, Math.max(0.1, 0.2 + (1-premiumAggression)*0.55 + myHandSize*0.04));
@@ -1334,6 +1349,117 @@ function aiChooseMove(idx){
   }
   return best.arr;
 }
+
+/* ============================================================
+   モンテカルロ先読みAI(強い難易度用)
+   相手の見えていない手札を「見えているカードの残り」から無作為に配り直して(determinization)、
+   候補手ごとに既存の評価AIで最後まで打ち切るロールアウトを繰り返し、平均順位が最良の手を選ぶ。
+   ============================================================ */
+const MC_CONFIG={enabled:true, topK:5, maxMs:320, minRollouts:4};
+let __mcBusy=false;
+function snapshotState(){
+  const o={};
+  Object.keys(state).forEach(k=>{
+    if(k==='lang'||k==='learnedStats') return;
+    const v=state[k];
+    o[k]= v instanceof Set ? {__set:[...v]} : (v===undefined ? undefined : JSON.parse(JSON.stringify(v)));
+  });
+  return o;
+}
+function restoreState(snap){
+  Object.keys(snap).forEach(k=>{
+    const v=snap[k];
+    state[k]= (v && v.__set) ? new Set(v.__set) : (v===undefined ? undefined : JSON.parse(JSON.stringify(v)));
+  });
+}
+function mcDealHiddenHands(idx, knownIds){
+  const pool=shuffle(buildDeck().filter(c=>!knownIds.has(c.id)));
+  let pos=0;
+  state.players.forEach((p,i)=>{
+    if(i===idx || p.finished) return;
+    const n=p.hand.length;
+    p.hand=sortHand(pool.slice(pos,pos+n)); pos+=n;
+  });
+}
+function mcRollout(idx, firstMove, knownIds){
+  // 返り値: 0(最下位)〜1(1位)の評価値
+  mcDealHiddenHands(idx, knownIds);
+  state.players.forEach(p=>{p.isCPU=true;});
+  if(firstMove===null) passTurn();
+  else {
+    const ids=firstMove.map(c=>c.id);
+    applyPlay(idx, ids, cpuChooseJokerAssignment(idx, ids));
+  }
+  let guard=0;
+  while(state.screen!=='result' && guard++<400){
+    if(state.players[idx].finished) break; // 自分が上がり/反則で確定したら終了(順位は下で見積もる)
+    const i=state.currentIndex;
+    const mv=aiChooseMoveHeuristic(i);
+    if(mv){ const ids=mv.map(c=>c.id); applyPlay(i, ids, cpuChooseJokerAssignment(i, ids)); }
+    else if(state.field!==null) passTurn();
+    else break;
+  }
+  const n=state.players.length;
+  if(state.players[idx].fouled) return 0;
+  let pos=state.finishOrder.indexOf(idx);
+  if(pos<0) pos=n-1;
+  return 1-pos/(n-1);
+}
+function aiChooseMove(idx){
+  if(__mcBusy) return aiChooseMoveHeuristic(idx);
+  if(state.cpuLevel==='easy'){
+    // やさしい: 上位候補の中からときどき(約35%)ランダムに選ぶ(反則手は候補に入らない)
+    const top=aiChooseMoveHeuristic(idx,{topK:6});
+    if(!top) return null;
+    if(top.length>1 && Math.random()<0.35) return top[1+Math.floor(Math.random()*(top.length-1))];
+    return top[0];
+  }
+  if(state.cpuLevel!=='strong' || !MC_CONFIG.enabled || state.players[idx].hand.length<=1) return aiChooseMoveHeuristic(idx);
+  const hand=state.players[idx].hand;
+  const cands=aiChooseMoveHeuristic(idx,{topK:MC_CONFIG.topK});
+  if(!cands) return null; // 安全に出せる手がない→パス
+  const options=cands.slice();
+  if(state.field!==null) options.push(null); // パスも候補に含める
+  if(options.length<=1) return options.length===1 ? options[0] : aiChooseMoveHeuristic(idx);
+  // 場に何も影響しない確定の手(上がり)は探索せず即決
+  if(cands.length>0 && cands[0].length===hand.length && candidateHasSafeInterpretation(idx,cands[0],evaluateSelection(idx,cands[0].map(c=>c.id)))) return cands[0];
+
+  const knownIds=new Set(hand.map(c=>c.id));
+  state.trickHistory.forEach(h=>{ if(h.kind==='play') (h.cards||[]).forEach(c=>knownIds.add(c.id)); });
+  const optIds=options.map(o=>o?o.map(c=>c.id):null);
+
+  const snap=snapshotState();
+  const realRender=render; const realSave=saveLearnedStats; const savedStats=JSON.stringify(state.learnedStats);
+  render=function(){}; saveLearnedStats=function(){};
+  __mcBusy=true;
+  const sums=options.map(()=>0), cnt=options.map(()=>0);
+  const t0=Date.now();
+  try{
+    let round=0;
+    while(true){
+      for(let k=0;k<options.length;k++){
+        restoreState(snap);
+        const hnd=state.players[idx].hand;
+        const mv= optIds[k]===null ? null : optIds[k].map(id=>hnd.find(c=>c.id===id));
+        sums[k]+=mcRollout(idx, mv, knownIds); cnt[k]++;
+      }
+      round++;
+      if(round>=MC_CONFIG.minRollouts && Date.now()-t0>MC_CONFIG.maxMs) break;
+      if(round>=60) break;
+    }
+  } finally {
+    restoreState(snap);
+    state.learnedStats=JSON.parse(savedStats);
+    render=realRender; saveLearnedStats=realSave; __mcBusy=false;
+  }
+  let bi=0, bv=-1;
+  for(let k=0;k<options.length;k++){ const v=sums[k]/cnt[k]; if(v>bv){bv=v;bi=k;} }
+  const chosen=options[bi];
+  if(chosen===null) return null;
+  const cur=state.players[idx].hand;
+  return chosen.map(c=>cur.find(x=>x.id===c.id));
+}
+
 function scheduleCPU(){
   const idx=state.currentIndex;
   setTimeout(()=>{
@@ -1499,6 +1625,19 @@ function renderSetup(root){
   for(let n=2;n<=5;n++) row.appendChild(el('button',{class:'count-btn'+(state.playerCount===n?' active':''),text:n+t('playerCountSuffix'),onclick:()=>{state.playerCount=n;render();}}));
   sec1.appendChild(row); card.appendChild(sec1);
 
+  if(isSelfMode()){
+    const secL=el('div',{class:'setup-section'});
+    secL.appendChild(el('div',{class:'setup-label',text:t('cpuLevelLabel')}));
+    const lvRow=el('div',{class:'count-row'});
+    [['easy','cpuLevelEasy'],['normal','cpuLevelNormal'],['strong','cpuLevelStrong']].forEach(([k,key])=>{
+      lvRow.appendChild(el('button',{class:'count-btn'+(state.cpuLevel===k?' active':''),text:t(key),onclick:()=>{
+        state.cpuLevel=k; try{localStorage.setItem('daifugoCpuLevel',k);}catch(e){} render();}}));
+    });
+    secL.appendChild(lvRow);
+    secL.appendChild(el('div',{class:'setup-label',text:t('cpuLevelDesc_'+state.cpuLevel),style:'margin-top:8px;'}));
+    card.appendChild(secL);
+  }
+
   const sec2=el('div',{class:'setup-section'});
   sec2.appendChild(el('div',{class:'setup-label',text: state.mode==='local' ? t('nameLabel') : t('nameLabelCpu')}));
   const list=el('div',{class:'name-list'});
@@ -1576,7 +1715,7 @@ function analyzeHand(playerIndex){
   });
   const revolutionStraights=straightFinds.filter(s=>s.ranks.length>=4);
 
-  const move=aiChooseMove(playerIndex);
+  const move=aiChooseMoveHeuristic(playerIndex);
   let recommendation=null;
   if(move){
     const v=evaluateSelection(playerIndex, move.map(c=>c.id));
