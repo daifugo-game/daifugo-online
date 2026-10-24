@@ -458,8 +458,8 @@ function processNextQueueItem(gs, actorIndex) {
 function resolveGiveDiscardCore(gs, actorIndex, type, ids) {
   const player = gs.players[actorIndex];
   const chosen = player.hand.filter(c => ids.includes(c.id));
-  // 7渡し・10捨てで手札が空になる場合: 最後のプレイにJOKERを含む、または最後に渡す/捨てるカードにJOKERがある → 反則
-  if (chosen.length === player.hand.length && (gs.lastPlayHadJoker || chosen.some(c => c.rank === 'JOKER'))) {
+  // 7渡し・10捨てで手札が空になる場合: 最後のプレイにJOKERを含んでいれば反則(残りのJOKERを渡して上がるのは正常)
+  if (chosen.length === player.hand.length && gs.lastPlayHadJoker) {
     player.hand = [];
     gs.pendingAction = null; gs.pendingCount = 0; gs.pendingActor = null; gs.selected = [];
     const roundEnded = commitFoulPenalty(gs, actorIndex, '禁止上がり(joker_finish)', chosen.length);

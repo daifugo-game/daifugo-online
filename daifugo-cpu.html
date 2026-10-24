@@ -951,8 +951,8 @@ function processNextQueueItem(actorIndex){
 function resolveGiveDiscardCore(actorIndex,type,ids){
   const player=state.players[actorIndex];
   const chosen=player.hand.filter(c=>ids.includes(c.id));
-  // 7渡し・10捨てで手札が空になる場合: 最後のプレイにJOKERを含む、または最後に渡す/捨てるカードにJOKERがある → 反則
-  if(chosen.length===player.hand.length && (state.lastPlayHadJoker || chosen.some(c=>c.rank==='JOKER'))){
+  // 7渡し・10捨てで手札が空になる場合: 最後のプレイにJOKERを含んでいれば反則(残りのJOKERを渡して上がるのは正常)
+  if(chosen.length===player.hand.length && state.lastPlayHadJoker){
     player.hand=[];
     state.pendingAction=null; state.pendingCount=0; state.pendingActor=null; state.selected=new Set();
     const roundEnded=commitFoulPenalty(actorIndex,'禁止上がり(joker_finish)',chosen.length);
@@ -1193,7 +1193,7 @@ function wouldFoulFinish(v, handLength){
 function candidateHasSafeInterpretation(idx, arr, v){
   const player=state.players[idx];
   if(v.count!==player.hand.length){
-    // 7渡し/10捨てで手札が空になる上がり: JOKERを含むプレイ、または最後のカードにJOKERが残る場合は反則
+    // 7渡し/10捨てで手札が空になる上がり: JOKERを含むプレイは反則
     let totalN=0;
     if(v.type==='set'){ if(v.rank==='7'||v.rank==='10') totalN=v.count; }
     else v.straightRanks.forEach(r=>{ if(r==='7'||r==='10') totalN++; });
@@ -1201,7 +1201,7 @@ function candidateHasSafeInterpretation(idx, arr, v){
       const ids=new Set(arr.map(c=>c.id));
       const remaining=player.hand.filter(c=>!ids.has(c.id));
       if(remaining.length>0 && remaining.length<=totalN &&
-         (arr.some(c=>c.rank==='JOKER') || remaining.some(c=>c.rank==='JOKER'))) return false;
+         arr.some(c=>c.rank==='JOKER')) return false;
     }
     return true; // 上がりでなければ反則対象外
   }
