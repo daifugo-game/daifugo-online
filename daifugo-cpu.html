@@ -1223,6 +1223,7 @@ function candidateHasSafeInterpretation(idx, arr, v){
   if(legal.length===0) return !wouldFoulFinish(v, player.hand.length); // 純JOKER等、選択肢が無い場合はデフォルト評価にフォールバック
   return legal.some(cand=>!evaluateFoulFinish(cand.evalResult, player.hand).isFoul);
 }
+let __fastRollout=false;
 function aiChooseMoveHeuristic(idx, opts){
   const player=state.players[idx];
   const raw=[...generateCandidates(player.hand), ...generateJokerCombinedCandidates(player.hand)];
@@ -1338,7 +1339,7 @@ function aiChooseMoveHeuristic(idx, opts){
     const remaining2=player.hand.filter(c=>!usedIds2.has(c.id));
     return score(v,arr) + simulateHandPotential(remaining2)*0.15; // 2手目簡易シミュレーション(軽めの重み、微調整用)
   }
-  shortlist.sort((a,b)=>refinedScore(a.v,a.arr)-refinedScore(b.v,b.arr));
+  if(!__fastRollout) shortlist.sort((a,b)=>refinedScore(a.v,a.arr)-refinedScore(b.v,b.arr)); // ロールアウト中は高速化のため2手目シミュレーションを省略
   candidates=shortlist.concat(candidates.slice(TOP_K));
   const best=candidates[0];
   if(opts && opts.topK) return candidates.slice(0,opts.topK).map(x=>x.arr); // モンテカルロ探索用: 上位候補のリストを返す
@@ -1355,7 +1356,7 @@ function aiChooseMoveHeuristic(idx, opts){
    相手の見えていない手札を「見えているカードの残り」から無作為に配り直して(determinization)、
    候補手ごとに既存の評価AIで最後まで打ち切るロールアウトを繰り返し、平均順位が最良の手を選ぶ。
    ============================================================ */
-const MC_CONFIG={enabled:true, topK:5, maxMs:320, minRollouts:4};
+const MC_CONFIG={enabled:true, topK:5, maxMs:140, minRollouts:4};
 let __mcBusy=false;
 function snapshotState(){
   const o={};
@@ -1372,18 +1373,23 @@ function restoreState(snap){
     state[k]= (v && v.__set) ? new Set(v.__set) : (v===undefined ? undefined : JSON.parse(JSON.stringify(v)));
   });
 }
-function mcDealHiddenHands(idx, knownIds){
+function mcMakeDeal(idx, knownIds){
+  // 見えていない相手手札の配り直し案(プレイヤー番号→カードの配列)。同じ案を全候補手で使い回して比較のブレを減らす
   const pool=shuffle(buildDeck().filter(c=>!knownIds.has(c.id)));
-  let pos=0;
+  const deal={}; let pos=0;
   state.players.forEach((p,i)=>{
     if(i===idx || p.finished) return;
     const n=p.hand.length;
-    p.hand=sortHand(pool.slice(pos,pos+n)); pos+=n;
+    deal[i]=pool.slice(pos,pos+n); pos+=n;
   });
+  return deal;
 }
-function mcRollout(idx, firstMove, knownIds){
+function mcApplyDeal(deal){
+  Object.keys(deal).forEach(i=>{ state.players[i].hand=sortHand(deal[i].map(c=>({suit:c.suit,rank:c.rank,id:c.id}))); });
+}
+function mcRollout(idx, firstMove, deal){
   // 返り値: 0(最下位)〜1(1位)の評価値
-  mcDealHiddenHands(idx, knownIds);
+  mcApplyDeal(deal);
   state.players.forEach(p=>{p.isCPU=true;});
   if(firstMove===null) passTurn();
   else {
@@ -1391,6 +1397,7 @@ function mcRollout(idx, firstMove, knownIds){
     applyPlay(idx, ids, cpuChooseJokerAssignment(idx, ids));
   }
   let guard=0;
+  __fastRollout=true;
   while(state.screen!=='result' && guard++<400){
     if(state.players[idx].finished) break; // 自分が上がり/反則で確定したら終了(順位は下で見積もる)
     const i=state.currentIndex;
@@ -1399,6 +1406,7 @@ function mcRollout(idx, firstMove, knownIds){
     else if(state.field!==null) passTurn();
     else break;
   }
+  __fastRollout=false;
   const n=state.players.length;
   if(state.players[idx].fouled) return 0;
   let pos=state.finishOrder.indexOf(idx);
@@ -1437,11 +1445,12 @@ function aiChooseMove(idx){
   try{
     let round=0;
     while(true){
+      const deal=mcMakeDeal(idx, knownIds);
       for(let k=0;k<options.length;k++){
         restoreState(snap);
         const hnd=state.players[idx].hand;
         const mv= optIds[k]===null ? null : optIds[k].map(id=>hnd.find(c=>c.id===id));
-        sums[k]+=mcRollout(idx, mv, knownIds); cnt[k]++;
+        sums[k]+=mcRollout(idx, mv, deal); cnt[k]++;
       }
       round++;
       if(round>=MC_CONFIG.minRollouts && Date.now()-t0>MC_CONFIG.maxMs) break;
@@ -1450,7 +1459,7 @@ function aiChooseMove(idx){
   } finally {
     restoreState(snap);
     state.learnedStats=JSON.parse(savedStats);
-    render=realRender; saveLearnedStats=realSave; __mcBusy=false;
+    render=realRender; saveLearnedStats=realSave; __mcBusy=false; __fastRollout=false;
   }
   let bi=0, bv=-1;
   for(let k=0;k<options.length;k++){ const v=sums[k]/cnt[k]; if(v>bv){bv=v;bi=k;} }
@@ -1472,7 +1481,7 @@ function scheduleCPU(){
       }
       else passTurn();
     }
-  },700);
+  },state.cpuLevel==="strong"?220:260);
 }
 
 /* ---------- rendering ---------- */
