@@ -460,7 +460,7 @@ const state={
   foulRateMultiplier:1,
   pendingFoulPenalties:[],
   foulOrder:[],
-  pendingFoulPlayCount:0,
+  pendingFoulPlayCount:0, lastPlayHadJoker:false,
   pendingJokerChoices:null,
   pendingJokerCardIds:null,
 };
@@ -905,6 +905,7 @@ function applyPlay(playerIndex,cardIds,jokerAssignment){
   state.log=logMsg;
 
   state.pendingFoulPlayCount = v.count;
+  state.lastPlayHadJoker = v.cards.some(c=>c.rank==='JOKER');
 
   if(finishedNow){
     if(finalizeRoundIfEnded()){ render(); return true; }
@@ -950,6 +951,14 @@ function processNextQueueItem(actorIndex){
 function resolveGiveDiscardCore(actorIndex,type,ids){
   const player=state.players[actorIndex];
   const chosen=player.hand.filter(c=>ids.includes(c.id));
+  // 7渡し・10捨てで手札が空になる場合: 最後のプレイにJOKERを含む、または最後に渡す/捨てるカードにJOKERがある → 反則
+  if(chosen.length===player.hand.length && (state.lastPlayHadJoker || chosen.some(c=>c.rank==='JOKER'))){
+    player.hand=[];
+    state.pendingAction=null; state.pendingCount=0; state.pendingActor=null; state.selected=new Set();
+    const roundEnded=commitFoulPenalty(actorIndex,'禁止上がり(joker_finish)',chosen.length);
+    if(!roundEnded) advance(actorIndex,{tobiSteps:1});
+    return true;
+  }
   player.hand=player.hand.filter(c=>!ids.includes(c.id));
   if(type==='give'){
     const nextIdx=nextActiveRaw(actorIndex);
@@ -1183,7 +1192,19 @@ function wouldFoulFinish(v, handLength){
 }
 function candidateHasSafeInterpretation(idx, arr, v){
   const player=state.players[idx];
-  if(v.count!==player.hand.length) return true; // 上がりでなければ反則対象外
+  if(v.count!==player.hand.length){
+    // 7渡し/10捨てで手札が空になる上がり: JOKERを含むプレイ、または最後のカードにJOKERが残る場合は反則
+    let totalN=0;
+    if(v.type==='set'){ if(v.rank==='7'||v.rank==='10') totalN=v.count; }
+    else v.straightRanks.forEach(r=>{ if(r==='7'||r==='10') totalN++; });
+    if(totalN>0){
+      const ids=new Set(arr.map(c=>c.id));
+      const remaining=player.hand.filter(c=>!ids.has(c.id));
+      if(remaining.length>0 && remaining.length<=totalN &&
+         (arr.some(c=>c.rank==='JOKER') || remaining.some(c=>c.rank==='JOKER'))) return false;
+    }
+    return true; // 上がりでなければ反則対象外
+  }
   const hasJoker = arr.some(c=>c.rank==='JOKER');
   if(!hasJoker) return !wouldFoulFinish(v, player.hand.length);
   const cardIds=arr.map(c=>c.id);
