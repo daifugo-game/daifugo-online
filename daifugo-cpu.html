@@ -258,6 +258,7 @@ const I18N={
     startGameBtn:'ゲームを始める',
     learnedStatsWithData:n=>`CPUはこれまでの対戦(${n}回の判断)からあなたの出し方の傾向を学習しています`,
     learnedStatsNoData:'CPUはこれから対戦するたびにあなたの出し方の傾向を学習します',
+    cpuSpeedLabel:'CPUの速さ', cpuSpeedFast:'はやい', cpuSpeedNormal:'ふつう', cpuSpeedSlow:'ゆっくり',
     cpuLevelLabel:'CPUの強さ', cpuLevelEasy:'やさしい', cpuLevelNormal:'ふつう', cpuLevelStrong:'つよい',
     cpuLevelDesc_easy:'ときどき最善でない手を選びます。大富豪に慣れていない方向け。',
     cpuLevelDesc_normal:'反則を避けながら、手札の整理と強さを意識して打ちます。',
@@ -354,6 +355,7 @@ const I18N={
     startGameBtn:'Start Game',
     learnedStatsWithData:n=>`The CPU has learned your play style from ${n} past decisions.`,
     learnedStatsNoData:'The CPU will learn your play style as you play more games.',
+    cpuSpeedLabel:'CPU speed', cpuSpeedFast:'Fast', cpuSpeedNormal:'Normal', cpuSpeedSlow:'Slow',
     cpuLevelLabel:'CPU level', cpuLevelEasy:'Easy', cpuLevelNormal:'Normal', cpuLevelStrong:'Strong',
     cpuLevelDesc_easy:'Sometimes picks a non-optimal move. Good for beginners.',
     cpuLevelDesc_normal:'Avoids fouls and plays sensibly by hand organization and card strength.',
@@ -471,6 +473,7 @@ const state={
   pendingFoulPlayCount:0, lastPlayHadJoker:false,
   pendingJokerChoices:null,
   pendingJokerCardIds:null,
+  cpuSpeed:(function(){try{const v=localStorage.getItem('daifugoCpuSpeed'); if(v==='fast'||v==='normal'||v==='slow') return v;}catch(e){} return 'normal';})(),
   cpuLevel:(function(){try{const v=localStorage.getItem('daifugoCpuLevel'); if(v==='easy'||v==='normal'||v==='strong') return v;}catch(e){} return 'strong';})(),
 };
 
@@ -1481,7 +1484,7 @@ function scheduleCPU(){
       }
       else passTurn();
     }
-  },state.cpuLevel==="strong"?220:260);
+  },({fast:180,normal:420,slow:800})[state.cpuSpeed]||420);
 }
 
 /* ---------- rendering ---------- */
@@ -1644,6 +1647,13 @@ function renderSetup(root){
     });
     secL.appendChild(lvRow);
     secL.appendChild(el('div',{class:'setup-label',text:t('cpuLevelDesc_'+state.cpuLevel),style:'margin-top:8px;'}));
+    secL.appendChild(el('div',{class:'setup-label',text:t('cpuSpeedLabel'),style:'margin-top:14px;'}));
+    const spRow=el('div',{class:'count-row'});
+    [['fast','cpuSpeedFast'],['normal','cpuSpeedNormal'],['slow','cpuSpeedSlow']].forEach(([k,key])=>{
+      spRow.appendChild(el('button',{class:'count-btn'+(state.cpuSpeed===k?' active':''),text:t(key),onclick:()=>{
+        state.cpuSpeed=k; try{localStorage.setItem('daifugoCpuSpeed',k);}catch(e){} render();}}));
+    });
+    secL.appendChild(spRow);
     card.appendChild(secL);
   }
 
