@@ -9,11 +9,41 @@ const SUITS = ['♠', '♥', '♦', '♣'];
 const RANKS = ['3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A', '2'];
 const EFFECT_RANKS = ['5', '6', '7', '10', 'J']; // 8は別扱い(cutFlag)
 
-function buildDeck() {
+/* ============================================================
+   ローカルルール定義(オン/オフ可能)。カードの基本の強さは変更しない。
+   ============================================================ */
+const RULE_DEFS = [
+  { id: 'revolution',  kana: 'カクメイ',       ja: '革命',         en: 'Revolution',     jaDesc: '同じ数字を4枚以上(階段4枚以上も)出すと、カードの強さが逆転する。もう一度出すと元に戻る。', enDesc: 'Play 4+ cards at once (or a 4+ run) and the card order flips. Do it again to flip back.', group: 'core' },
+  { id: 'straight',    kana: 'カイダン',       ja: '階段',         en: 'Runs (Straights)', jaDesc: '同じマークで連続する3枚以上をまとめて出せる。', enDesc: 'Play 3+ consecutive cards of the same suit together.', group: 'core' },
+  { id: 'joker',       kana: 'ジョーカー',     ja: 'JOKER',        en: 'Jokers',         jaDesc: '最強のカード(2枚)。他のカードの代わりにもなる。オフなら52枚で遊ぶ。', enDesc: 'Two wild cards, strongest in the deck and can stand in for any card. Off = 52-card deck.', group: 'core' },
+  { id: 'shibari',     kana: 'シバリ',         ja: 'マーク縛り',   en: 'Suit Lock',      jaDesc: '同じマークが2回続けて出ると、そのマークしか出せなくなる。', enDesc: 'Two plays in a row with the same suit(s) lock the trick to that suit.', group: 'lock' },
+  { id: 'gekishibari', kana: 'ゲキシバリ',     ja: '激縛り',       en: 'Strict Lock',    jaDesc: '縛り中に、さらに1つ上の数字が続くと、次はその数字(同じマーク)かJOKERしか出せない。', enDesc: 'During a Suit Lock, if the next rank up is played, only that exact card (or a Joker) is allowed next.', group: 'lock' },
+  { id: 'rokuLock',    kana: 'ロクシバリ',     ja: '6ロック',      en: 'Six Lock',       jaDesc: '6を出すと、次の人は同じマークしか出せない。', enDesc: 'Play a 6 and the next player must follow the same suit.', group: 'effect' },
+  { id: 'fiveSkip',    kana: 'ゴトビ',         ja: '5飛び',        en: 'Five Skip',      jaDesc: '5を出すと、次の人を飛ばす(枚数ぶん飛ぶ)。', enDesc: 'Play a 5 and the next player is skipped (one extra skip per card).', group: 'effect' },
+  { id: 'sevenGive',   kana: 'ナナワタシ',     ja: '7渡し',        en: 'Seven Pass',     jaDesc: '7を出すと、手札から出した枚数ぶん、次の人へ渡す。', enDesc: 'Play a 7 and hand that many cards from your hand to the next player.', group: 'effect' },
+  { id: 'eightCut',    kana: 'ヤギリ',         ja: '8切り',        en: 'Eight Cut',      jaDesc: '8を出すと場が流れて、自分がもう一度親になる。', enDesc: 'Play an 8 and the pile is cleared; you lead again.', group: 'effect' },
+  { id: 'tenDiscard',  kana: 'ジュウステ',     ja: '10捨て',       en: 'Ten Discard',    jaDesc: '10を出すと、手札から出した枚数ぶん捨てられる。', enDesc: 'Play a 10 and discard that many cards from your hand.', group: 'effect' },
+  { id: 'elevenBack',  kana: 'イレブンバック', ja: 'Jバック',      en: 'Jack Back',      jaDesc: 'Jを出すと、その場が終わるまで強さが逆転する。', enDesc: 'Play a Jack and the card order is reversed until the pile is cleared.', group: 'effect' },
+  { id: 'spade3',      kana: 'スペサンガエシ', ja: 'スペ3返し',    en: 'Spade-3 Reversal', jaDesc: 'JOKER単体には、♠3だけが勝てる。', enDesc: 'A lone Joker can only be beaten by the 3 of Spades.', group: 'effect' },
+  { id: 'foulFinish',  kana: 'キンシアガリ',   ja: '禁止上がり',   en: 'Illegal Finish', jaDesc: 'JOKER・8・(通常時の)2・(革命中の)3で上がると反則。7渡し/10捨てを果たせない上がりも反則。', enDesc: 'Finishing on a Joker, 8, a 2 (normal) or a 3 (revolution) is a foul, as is finishing before a 7/10 can be carried out.', group: 'effect' },
+];
+const DEFAULT_RULES = {};
+RULE_DEFS.forEach(r => { DEFAULT_RULES[r.id] = true; });
+function normalizeRules(input) {
+  const out = Object.assign({}, DEFAULT_RULES);
+  if (input && typeof input === 'object') RULE_DEFS.forEach(r => { if (typeof input[r.id] === 'boolean') out[r.id] = input[r.id]; });
+  if (!out.shibari) out.gekishibari = false;
+  return out;
+}
+function ruleOn(gs, id) { return !gs.rules || gs.rules[id] !== false; }
+
+function buildDeck(rules) {
   const d = [];
   SUITS.forEach(s => RANKS.forEach(r => d.push({ suit: s, rank: r, id: s + r })));
-  d.push({ suit: null, rank: 'JOKER', id: 'JOKER-A' });
-  d.push({ suit: null, rank: 'JOKER', id: 'JOKER-B' });
+  if (!rules || rules.joker !== false) {
+    d.push({ suit: null, rank: 'JOKER', id: 'JOKER-A' });
+    d.push({ suit: null, rank: 'JOKER', id: 'JOKER-B' });
+  }
   return d;
 }
 function shuffle(a) {
@@ -163,6 +193,7 @@ function evaluateSelection(gs, playerIndex, cardIds, jokerAssignment) {
       suitsUsed = [...new Set([...realCards.map(c => c.suit), ...jokerSuits])];
       if (jokers.length > 0) effectiveJokerAssignment = jokers.map((j, i) => ({ id: j.id, rank: realRanksArr[0], suit: jokerSuits[i] }));
     } else {
+      if (!ruleOn(gs, 'straight')) return { ok: false };
       const suits = realCards.map(c => c.suit);
       if (!suits.every(s => s === suits[0])) return { ok: false };
       let chosenSuit, chosenRanks, jokerRanksChosen;
@@ -186,7 +217,7 @@ function evaluateSelection(gs, playerIndex, cardIds, jokerAssignment) {
     }
   }
   const count = cards.length;
-  const isSpade3Counter = !!(gs.field && gs.field.count === 1 && gs.field.cards[0].rank === 'JOKER' &&
+  const isSpade3Counter = !!(ruleOn(gs, 'spade3') && gs.field && gs.field.count === 1 && gs.field.cards[0].rank === 'JOKER' &&
     count === 1 && cards[0].suit === '♠' && cards[0].rank === '3');
   const isAllJoker = realCards.length === 0;
 
@@ -209,13 +240,14 @@ function evaluateSelection(gs, playerIndex, cardIds, jokerAssignment) {
 
 function evaluateFoulFinish(gs, v, handBeforePlay) {
   const wouldFinish = v.count === handBeforePlay.length;
+  if (!ruleOn(gs, 'foulFinish')) return { isFoul: false, reasons: [] };
   if (!wouldFinish) return { isFoul: false, reasons: [] };
   if (v.isSpade3Counter) return { isFoul: false, reasons: [] };
   const reasons = [];
   const ranksInvolved = v.type === 'straight' ? v.straightRanks : [v.rank];
   const containsJokerPhysical = v.cards.some(c => c.rank === 'JOKER');
   if (containsJokerPhysical) reasons.push('joker_finish');
-  if (ranksInvolved.includes('8')) reasons.push('eight_finish');
+  if (ruleOn(gs, 'eightCut') && ranksInvolved.includes('8')) reasons.push('eight_finish');
   const revActive = gs.revolutionCount % 2 === 1;
   if (!revActive && ranksInvolved.includes('2')) reasons.push('normal_2_finish');
   if (revActive && ranksInvolved.includes('3')) reasons.push('revolution_3_finish');
@@ -226,6 +258,7 @@ function evaluateFoulFinish(gs, v, handBeforePlay) {
    縛り・激縛りチェーン
    ============================================================ */
 function updateSuitChain(gs, v, reversedAtValidation) {
+  if (!ruleOn(gs, 'shibari')) { gs.prevTrack = null; return; }
   let track = null;
   if (v.type === 'straight') track = { kind: 'straight', suits: [v.suitsUsed[0]], rank: v.rank, count: v.count };
   else if (v.type === 'set' && v.suitsUsed.length > 0) track = { kind: 'set', suits: v.suitsUsed.slice().sort(), rank: v.rank, count: v.count };
@@ -244,7 +277,7 @@ function updateSuitChain(gs, v, reversedAtValidation) {
     const sequential = track.kind === 'set' &&
       strengthWithReversal(track.rank, reversedAtValidation) === strengthWithReversal(gs.prevTrack.rank, reversedAtValidation) + 1;
     const suitLabel = track.suits.join('');
-    if (sequential) {
+    if (sequential && ruleOn(gs, 'gekishibari')) {
       const nextRank = nextStrongerRank(gs, track.rank);
       if (nextRank) {
         gs.lockSeq = { suits: track.suits, rank: nextRank, count: track.count };
@@ -372,7 +405,7 @@ function applyPlay(gs, playerIndex, cardIds, jokerAssignment) {
   if (v.type === 'set') effects.push({ rank: v.rank, count: v.count });
   else v.straightRanks.forEach(r => { if (EFFECT_RANKS.includes(r) || r === '8') effects.push({ rank: r, count: 1 }); });
 
-  if (v.count >= 4) {
+  if (v.count >= 4 && ruleOn(gs, 'revolution')) {
     gs.revolutionCount++;
     logMsg += `(革命!累計${gs.revolutionCount}回)`;
   }
@@ -382,6 +415,8 @@ function applyPlay(gs, playerIndex, cardIds, jokerAssignment) {
   ['6', 'J', '7', '10', '5', '8'].forEach(r => {
     const e = effects.find(x => x.rank === r);
     if (!e) return;
+    const ruleId = { '6': 'rokuLock', 'J': 'elevenBack', '7': 'sevenGive', '10': 'tenDiscard', '5': 'fiveSkip', '8': 'eightCut' }[r];
+    if (!ruleOn(gs, ruleId)) return;
     if (r === '6') { gs.lockSuits = v.suitsUsed.slice(); gs.lockSeq = null; logMsg += `(6ロック発動!次は${gs.lockSuits.join('/')}のみ)`; }
     if (r === 'J') { gs.tempReversed = !gs.tempReversed; logMsg += '(強さ反転)'; }
     if (r === '7') { queue.push({ type: 'give', n: e.count }); }
@@ -400,7 +435,8 @@ function applyPlay(gs, playerIndex, cardIds, jokerAssignment) {
   const finishedNow = player.hand.length === 0;
   if (finishedNow) {
     const contentFoul = evaluateFoulFinish(gs, v, handBeforePlay);
-    const unfulfillableGiveDiscard = queue.length > 0;
+    const unfulfillableGiveDiscard = queue.length > 0 && ruleOn(gs, 'foulFinish');
+    if (!ruleOn(gs, 'foulFinish')) queue.length = 0;
     const foulReasons = [...contentFoul.reasons];
     if (unfulfillableGiveDiscard) foulReasons.push(...queue.map(q => q.type === 'give' ? 'seven_unfulfilled' : 'ten_unfulfilled'));
     if (foulReasons.length > 0) {
@@ -447,6 +483,7 @@ function processNextQueueItem(gs, actorIndex) {
   const item = gs.effectQueue.shift();
   const player = gs.players[actorIndex];
   if (player.hand.length < item.n) {
+    if (!ruleOn(gs, 'foulFinish')) { processNextQueueItem(gs, actorIndex); return; }
     const roundEnded = commitFoulPenalty(gs, actorIndex, item.type === 'give' ? '7渡し' : '10捨て', gs.pendingFoulPlayCount);
     if (!roundEnded) advance(gs, actorIndex, { tobiSteps: 1 });
     return;
@@ -459,7 +496,7 @@ function resolveGiveDiscardCore(gs, actorIndex, type, ids) {
   const player = gs.players[actorIndex];
   const chosen = player.hand.filter(c => ids.includes(c.id));
   // 7渡し・10捨てで手札が空になる場合: 最後のプレイにJOKERを含んでいれば反則(残りのJOKERを渡して上がるのは正常)
-  if (chosen.length === player.hand.length && gs.lastPlayHadJoker) {
+  if (chosen.length === player.hand.length && gs.lastPlayHadJoker && ruleOn(gs, 'foulFinish')) {
     player.hand = [];
     gs.pendingAction = null; gs.pendingCount = 0; gs.pendingActor = null; gs.selected = [];
     const roundEnded = commitFoulPenalty(gs, actorIndex, '禁止上がり(joker_finish)', chosen.length);
@@ -640,7 +677,7 @@ function rankLabels(n) {
   return labels;
 }
 function dealRound(gs) {
-  const deck = shuffle(buildDeck());
+  const deck = shuffle(buildDeck(gs.rules));
   const n = gs.players.length;
   gs.players.forEach(p => { p.hand = []; p.finished = false; p.fouled = false; });
   deck.forEach((c, i) => gs.players[i % n].hand.push(c));
@@ -662,8 +699,9 @@ function dealRound(gs) {
   gs.foulOrder = [];
   gs.phase = 'playing';
 }
-function createGameState(playersMeta) {
+function createGameState(playersMeta, rules) {
   const gs = {
+    rules: normalizeRules(rules),
     phase: 'playing',
     roundNumber: 1,
     players: playersMeta.map(p => ({ name: p.name, hand: [], finished: false, fouled: false, score: 0 })),
@@ -682,6 +720,7 @@ function createGameState(playersMeta) {
 }
 
 module.exports = {
+  RULE_DEFS, DEFAULT_RULES, normalizeRules, ruleOn,
   buildDeck, shuffle, sortHand, isRed, RANKS, SUITS,
   evaluateSelection, evaluateFoulFinish, describePlay, playCards, passTurn, confirmGiveDiscard,
   dealRound, createGameState, rankLabels, calculateRoundScore,

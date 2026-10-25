@@ -33,6 +33,7 @@ function createRoom(hostName) {
     phase: 'lobby', // 'lobby' | 'playing'
     players: [{ id: 0, token: makeToken(), name: hostName || 'ホスト', connected: true, lastPoll: Date.now() }],
     gs: null,
+    rules: engine.normalizeRules(null),
   };
   rooms[code] = room;
   return room;
@@ -119,6 +120,7 @@ function serializeForPlayer(room, viewerId) {
     lobbyPlayers: room.players.map(p => ({ id: p.id, name: p.name, connected: p.connected })),
     youId: viewerId,
     isHost: viewerId === 0,
+    rules: room.rules,
   };
   if (room.phase === 'lobby' || !room.gs) return base;
   const gs = room.gs;
@@ -279,12 +281,18 @@ const server = http.createServer(async (req, res) => {
 });
 
 function handleAction(room, playerId, action) {
+  if (action.type === 'setRules') {
+    if (playerId !== 0) return { error: 'host_only' };
+    if (room.phase !== 'lobby') return { error: 'already_started' };
+    room.rules = engine.normalizeRules(Object.assign({}, room.rules, action.rules || {}));
+    return { ok: true };
+  }
   if (action.type === 'start') {
     if (playerId !== 0) return { error: 'host_only' };
     if (room.phase !== 'lobby') return { error: 'already_started' };
     if (room.players.length < 2) return { error: 'need_more_players' };
     room.phase = 'playing';
-    room.gs = engine.createGameState(room.players.map(p => ({ name: p.name })));
+    room.gs = engine.createGameState(room.players.map(p => ({ name: p.name })), room.rules);
     return { ok: true };
   }
   if (!room.gs) return { error: 'not_started' };

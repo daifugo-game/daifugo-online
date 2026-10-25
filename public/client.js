@@ -496,7 +496,95 @@ function renderLanding(root){
   wrap.appendChild(card); root.appendChild(wrap);
 }
 
+/*RULE_META_START*/
+const RULE_META = [
+  {"id":"revolution","kana":"カクメイ","ja":"革命","en":"Revolution","jaDesc":"同じ数字を4枚以上(階段4枚以上も)出すと、カードの強さが逆転する。もう一度出すと元に戻る。","enDesc":"Play 4+ cards at once (or a 4+ run) and the card order flips. Do it again to flip back.","group":"core"},
+  {"id":"straight","kana":"カイダン","ja":"階段","en":"Runs (Straights)","jaDesc":"同じマークで連続する3枚以上をまとめて出せる。","enDesc":"Play 3+ consecutive cards of the same suit together.","group":"core"},
+  {"id":"joker","kana":"ジョーカー","ja":"JOKER","en":"Jokers","jaDesc":"最強のカード(2枚)。他のカードの代わりにもなる。オフなら52枚で遊ぶ。","enDesc":"Two wild cards, strongest in the deck and can stand in for any card. Off = 52-card deck.","group":"core"},
+  {"id":"shibari","kana":"シバリ","ja":"マーク縛り","en":"Suit Lock","jaDesc":"同じマークが2回続けて出ると、そのマークしか出せなくなる。","enDesc":"Two plays in a row with the same suit(s) lock the trick to that suit.","group":"lock"},
+  {"id":"gekishibari","kana":"ゲキシバリ","ja":"激縛り","en":"Strict Lock","jaDesc":"縛り中に、さらに1つ上の数字が続くと、次はその数字(同じマーク)かJOKERしか出せない。","enDesc":"During a Suit Lock, if the next rank up is played, only that exact card (or a Joker) is allowed next.","group":"lock"},
+  {"id":"rokuLock","kana":"ロクシバリ","ja":"6ロック","en":"Six Lock","jaDesc":"6を出すと、次の人は同じマークしか出せない。","enDesc":"Play a 6 and the next player must follow the same suit.","group":"effect"},
+  {"id":"fiveSkip","kana":"ゴトビ","ja":"5飛び","en":"Five Skip","jaDesc":"5を出すと、次の人を飛ばす(枚数ぶん飛ぶ)。","enDesc":"Play a 5 and the next player is skipped (one extra skip per card).","group":"effect"},
+  {"id":"sevenGive","kana":"ナナワタシ","ja":"7渡し","en":"Seven Pass","jaDesc":"7を出すと、手札から出した枚数ぶん、次の人へ渡す。","enDesc":"Play a 7 and hand that many cards from your hand to the next player.","group":"effect"},
+  {"id":"eightCut","kana":"ヤギリ","ja":"8切り","en":"Eight Cut","jaDesc":"8を出すと場が流れて、自分がもう一度親になる。","enDesc":"Play an 8 and the pile is cleared; you lead again.","group":"effect"},
+  {"id":"tenDiscard","kana":"ジュウステ","ja":"10捨て","en":"Ten Discard","jaDesc":"10を出すと、手札から出した枚数ぶん捨てられる。","enDesc":"Play a 10 and discard that many cards from your hand.","group":"effect"},
+  {"id":"elevenBack","kana":"イレブンバック","ja":"Jバック","en":"Jack Back","jaDesc":"Jを出すと、その場が終わるまで強さが逆転する。","enDesc":"Play a Jack and the card order is reversed until the pile is cleared.","group":"effect"},
+  {"id":"spade3","kana":"スペサンガエシ","ja":"スペ3返し","en":"Spade-3 Reversal","jaDesc":"JOKER単体には、♠3だけが勝てる。","enDesc":"A lone Joker can only be beaten by the 3 of Spades.","group":"effect"},
+  {"id":"foulFinish","kana":"キンシアガリ","ja":"禁止上がり","en":"Illegal Finish","jaDesc":"JOKER・8・(通常時の)2・(革命中の)3で上がると反則。7渡し/10捨てを果たせない上がりも反則。","enDesc":"Finishing on a Joker, 8, a 2 (normal) or a 3 (revolution) is a foul, as is finishing before a 7/10 can be carried out.","group":"effect"}
+];
+/*RULE_META_END*/
+/*RULE_PANEL_START*/
+const RULE_GROUPS = {
+  ja: { core: '基本', lock: '縛り', effect: '数字の効果' },
+  en: { core: 'Core', lock: 'Locks', effect: 'Card effects' }
+};
+const RULE_UI = {
+  ja: { title: 'ローカルルール', hint: 'カードの強さは変えず、遊び方だけを選べます。', std: '標準に戻す', off: 'すべてオフ', readonly: 'ホストが設定します', on: 'ON', offLabel: 'OFF' },
+  en: { title: 'House Rules', hint: 'Card strength never changes — pick how deep the strategy goes.', std: 'Reset to default', off: 'All off', readonly: 'Set by the host', on: 'ON', offLabel: 'OFF' }
+};
+function ruleNames(r, lang) {
+  return lang === 'en' ? { main: r.en, sub: r.kana + ' / ' + r.ja } : { main: r.kana, sub: r.ja + ' · ' + r.en };
+}
+function buildRulePanel(opts) {
+  const { rules, editable, lang, onChange } = opts;
+  const U = RULE_UI[lang] || RULE_UI.ja, G = RULE_GROUPS[lang] || RULE_GROUPS.ja;
+  const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
+  const panel = mk('div', 'rule-panel');
+  const head = mk('div', 'rule-head');
+  head.appendChild(mk('div', 'rule-title', U.title));
+  panel.appendChild(head);
+  panel.appendChild(mk('div', 'rule-hint', U.hint));
+  if (editable) {
+    const bar = mk('div', 'rule-presets');
+    const b1 = mk('button', 'rule-preset', U.std); b1.onclick = () => { const o = {}; RULE_META.forEach(r => o[r.id] = true); onChange(o); };
+    const b2 = mk('button', 'rule-preset', U.off); b2.onclick = () => { const o = {}; RULE_META.forEach(r => o[r.id] = false); onChange(o); };
+    bar.appendChild(b1); bar.appendChild(b2); panel.appendChild(bar);
+  } else panel.appendChild(mk('div', 'rule-ro', U.readonly));
+  ['core', 'lock', 'effect'].forEach(g => {
+    panel.appendChild(mk('div', 'rule-group', G[g]));
+    RULE_META.filter(r => r.group === g).forEach(r => {
+      const on = rules[r.id] !== false;
+      const disabledByParent = r.id === 'gekishibari' && rules.shibari === false;
+      const row = mk('div', 'rule-row' + (on && !disabledByParent ? ' on' : '') + (disabledByParent ? ' dim' : ''));
+      const txt = mk('div', 'rule-txt');
+      const nm = ruleNames(r, lang);
+      txt.appendChild(mk('div', 'rule-name', nm.main));
+      txt.appendChild(mk('div', 'rule-sub', nm.sub));
+      txt.appendChild(mk('div', 'rule-desc', lang === 'en' ? r.enDesc : r.jaDesc));
+      row.appendChild(txt);
+      const sw = mk('button', 'rule-sw' + (on ? ' on' : ''), on ? U.on : U.offLabel);
+      sw.setAttribute('aria-pressed', on ? 'true' : 'false');
+      if (!editable || disabledByParent) sw.disabled = true;
+      sw.onclick = () => onChange({ [r.id]: !on });
+      row.appendChild(sw);
+      panel.appendChild(row);
+    });
+  });
+  return panel;
+}
+const RULE_CSS = `
+.rule-panel{margin:18px 0 6px;padding:14px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid var(--felt-line);text-align:left;}
+.rule-title{font-weight:700;color:var(--gold-soft);font-size:.95rem;}
+.rule-hint{font-size:.72rem;color:var(--muted);margin:3px 0 10px;line-height:1.5;}
+.rule-ro{font-size:.7rem;color:var(--muted-dim);margin-bottom:6px;}
+.rule-presets{display:flex;gap:8px;margin-bottom:6px;}
+.rule-preset{flex:1;padding:7px 8px;font-size:.72rem;border-radius:8px;border:1px solid var(--felt-line);background:transparent;color:var(--cream);cursor:pointer;}
+.rule-group{font-size:.68rem;letter-spacing:.08em;color:var(--gold-soft);margin:12px 0 4px;text-transform:uppercase;opacity:.85;}
+.rule-row{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:9px;margin-bottom:6px;background:rgba(0,0,0,.18);border:1px solid transparent;}
+.rule-row.on{border-color:rgba(214,178,94,.35);}
+.rule-row.dim{opacity:.45;}
+.rule-txt{flex:1;min-width:0;}
+.rule-name{font-weight:700;font-size:.88rem;color:var(--cream);}
+.rule-sub{font-size:.66rem;color:var(--muted);margin-top:1px;}
+.rule-desc{font-size:.7rem;color:var(--cream);opacity:.8;line-height:1.5;margin-top:4px;}
+.rule-sw{min-width:52px;padding:7px 0;border-radius:999px;border:1px solid var(--felt-line);background:rgba(255,255,255,.06);color:var(--muted);font-size:.7rem;font-weight:700;cursor:pointer;}
+.rule-sw.on{background:var(--gold-soft);color:#1b2a20;border-color:transparent;}
+.rule-sw:disabled{cursor:default;}
+`;
+/*RULE_PANEL_END*/
+
 /* ---------- render: lobby ---------- */
+(function(){ try{ const st=document.createElement('style'); st.textContent=RULE_CSS; document.head.appendChild(st);}catch(e){} })();
 function renderLobby(root){
   const wrap = el('div',{class:'landing-wrap'});
   const card = el('div',{class:'landing-card'});
@@ -520,6 +608,11 @@ function renderLobby(root){
     list.appendChild(row);
   });
   card.appendChild(list);
+
+  if(app.server && app.server.rules){
+    card.appendChild(buildRulePanel({rules:app.server.rules, editable:!!app.server.isHost, lang:app.lang,
+      onChange: (patch)=>sendAction({type:'setRules', rules:patch})}));
+  }
 
   const n = app.server ? app.server.lobbyPlayers.length : 1;
   if(app.server && app.server.isHost){
@@ -795,6 +888,7 @@ function renderRulesModal(root){
   box.appendChild(header);
 
   const R = t('rules');
+  if(app.server && app.server.rules) box.appendChild(buildRulePanel({rules:app.server.rules, editable:false, lang:app.lang, onChange:()=>{}}));
 
   // 1. 基本ルール
   const s1 = el('div',{class:'rules-section'});

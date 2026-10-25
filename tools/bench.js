@@ -3,6 +3,9 @@ const path=process.argv[2]||'/home/claude/daifugo-online/daifugo-cpu.html';
 const N=+process.argv[3]||400;
 const {api}=load(path);
 const s=api.state;
+// optional 4th arg: JSON of rules, e.g. '{"joker":false,"fiveSkip":false}'
+if(process.argv[4]) s.rules=Object.assign({},s.rules,JSON.parse(process.argv[4]));
+s.cpuLevel=process.env.LEVEL||s.cpuLevel;
 function legalMoves(i){
   const raw=[...api.generateCandidates(s.players[i].hand),...api.generateJokerCombinedCandidates(s.players[i].hand)];
   return raw.filter(arr=>api.evaluateSelection(i,arr.map(c=>c.id)).ok);
@@ -45,5 +48,5 @@ function matchup(label,seatBots){
   stats.forEach((st,k)=>console.log(`  ${seatBots[k].padEnd(7)} avgRank=${(st.rankSum/st.games).toFixed(2)} win=${(100*st.wins/st.games).toFixed(1)}% foul=${(100*st.fouls/st.games).toFixed(1)}%`));
 }
 matchup('ai x1 vs random x3',['ai','random','random','random']);
-matchup('ai x1 vs lowest x3',['ai','lowest','lowest','lowest']);
-matchup('ai x4 (mirror)',['ai','ai','ai','ai']);
+if(!process.env.QUICK){matchup('ai x1 vs lowest x3',['ai','lowest','lowest','lowest']);
+matchup('ai x4 (mirror)',['ai','ai','ai','ai']);}
