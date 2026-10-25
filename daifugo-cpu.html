@@ -183,6 +183,97 @@
   .modal-close{margin-top:16px;width:100%;padding:11px 0;border:none;border-radius:9px;background:rgba(255,255,255,.1);
     color:var(--cream);font-weight:700;cursor:pointer;font-family:inherit;}
 
+
+  /* ===== UI刷新(カードの視認性 / 場の主役化 / 手番の明示) ===== */
+  :root{ --cw:54px; --pw:46px; --ink2:#1b1916; --red2:#c4262e; }
+  .card{width:var(--cw);height:calc(var(--cw)*1.42);border-radius:calc(var(--cw)*.14);color:var(--ink2);
+    background:linear-gradient(180deg,#fffdf6,#f6efdc);border:1px solid rgba(0,0,0,.22);
+    box-shadow:0 2px 5px rgba(0,0,0,.32),inset 0 1px 0 rgba(255,255,255,.9);}
+  .card.red{color:var(--red2);}
+  .card .corner{top:calc(var(--cw)*.07);left:calc(var(--cw)*.09);}
+  .card .corner .r{font-size:calc(var(--cw)*.36);font-weight:900;letter-spacing:-.04em;}
+  .card .corner .s{font-size:calc(var(--cw)*.34);margin-top:0;}
+  .card .center-suit{inset:auto;right:calc(var(--cw)*.08);bottom:calc(var(--cw)*.06);left:auto;top:auto;
+    font-size:calc(var(--cw)*.62);opacity:.9;line-height:1;}
+  .card.joker{background:linear-gradient(160deg,#fff6d6 0%,#f3d77b 55%,#e2b93f 100%);color:#7a5600;border-color:#b98a12;}
+  .card.joker .corner .r{writing-mode:vertical-rl;font-size:calc(var(--cw)*.2);letter-spacing:.06em;font-weight:900;}
+  .card.joker .corner .s{display:none;}
+  .card.joker .center-suit{inset:0;right:auto;bottom:auto;display:flex;align-items:center;justify-content:center;
+    font-size:calc(var(--cw)*.8);opacity:1;filter:drop-shadow(0 1px 1px rgba(255,255,255,.7));color:#a77800;}
+  .card.selected{transform:translateY(calc(var(--cw)*-.3));
+    box-shadow:0 10px 18px rgba(0,0,0,.45),0 0 0 3px var(--gold),0 0 14px 2px rgba(232,207,122,.7);}
+  .hand-rows{display:flex;flex-direction:column;gap:2px;}
+  .hand-row-fan{justify-content:center;padding:calc(var(--cw)*.34) 4px 6px;overflow:visible;}
+
+  /* 手番の明示 */
+  .hand-panel{transition:box-shadow .25s,border-color .25s;border-top:2px solid transparent;}
+  .hand-panel.myturn{border-top-color:var(--gold);box-shadow:0 -8px 28px rgba(201,162,39,.28);
+    background:linear-gradient(180deg,rgba(201,162,39,.14),rgba(0,0,0,.18) 60%);}
+  .hand-panel.myturn .htitle{color:var(--felt-dark);background:var(--gold-soft);font-weight:900;padding:3px 12px;border-radius:999px;font-size:.82rem;}
+  .hand-head .hscore{font-size:.9rem;}
+  .btn.play:not(:disabled){box-shadow:0 0 0 2px rgba(232,207,122,.5),0 6px 16px rgba(201,162,39,.4);}
+  .btn.play:disabled{background:rgba(255,255,255,.07);color:var(--muted-dim);opacity:1;box-shadow:none;border:1px solid var(--felt-line);}
+  .btn:disabled{opacity:.6;}
+  .btn.pass:disabled,.btn.clear:disabled{opacity:.4;}
+  .hint-line{font-size:.8rem;color:var(--muted);}
+
+  /* 相手席 */
+  .seat{min-width:104px;padding:10px 14px 18px;}
+  .seat .sname{font-size:.86rem;}
+  .seat .sscore{font-size:.74rem;}
+  .face{width:42px;height:42px;font-size:1.1rem;color:#fff;border:2px solid rgba(255,255,255,.25);}
+  .seat.current{border-color:var(--gold);background:rgba(201,162,39,.18);
+    box-shadow:0 0 0 2px rgba(232,207,122,.55),0 0 22px rgba(201,162,39,.45);animation:seatPulse 1.4s ease-in-out infinite;}
+  .seat.current .sname{color:var(--gold-soft);}
+  @keyframes seatPulse{0%,100%{box-shadow:0 0 0 2px rgba(232,207,122,.55),0 0 14px rgba(201,162,39,.35);}50%{box-shadow:0 0 0 3px rgba(232,207,122,.8),0 0 26px rgba(201,162,39,.6);}}
+  .mini-fan{margin-bottom:16px;}
+  .mini-count-badge{right:auto;left:50%;transform:translateX(-50%);bottom:-19px;font-size:.78rem;padding:2px 9px;border-radius:10px;white-space:nowrap;}
+  .mini-count-badge.few{background:#e0654f;color:#fff;}
+
+  /* 場(テーブル中央) */
+  .field-zone{width:min(86%,520px);height:230px;}
+  .field-zone::before{content:'';position:absolute;inset:0;border-radius:50%;
+    background:radial-gradient(ellipse at center,rgba(255,255,255,.07),rgba(255,255,255,0) 68%);
+    border:1.5px dashed rgba(255,255,255,.16);pointer-events:none;}
+  .field-empty{color:var(--cream);opacity:.78;font-size:1.02rem;letter-spacing:.1em;position:relative;}
+  .field-cards{height:170px;}
+  .log-line{font-size:.82rem;color:var(--cream);opacity:.85;position:relative;}
+  .pile-cluster:not(.active){opacity:.5;}
+  .pile-cluster.active{filter:none;}
+  .pile-cluster.active .pile-cards{filter:drop-shadow(0 0 10px rgba(232,207,122,.85));}
+  .pile-tag{font-size:.74rem;padding:2px 10px;margin-bottom:5px;background:rgba(0,0,0,.55);color:var(--cream);}
+  .pile-cluster.active .pile-tag{background:var(--gold);color:var(--felt-dark);font-weight:900;font-size:.82rem;}
+  .pile-card{width:var(--pw);height:calc(var(--pw)*1.42);border-radius:calc(var(--pw)*.14);margin-left:calc(var(--pw)*-.3);
+    background:linear-gradient(180deg,#fffdf6,#f6efdc);color:var(--ink2);}
+  .pile-card.red{color:var(--red2);}
+  .pile-card .r{font-size:calc(var(--pw)*.42);font-weight:900;line-height:1;}
+  .pile-card .s{font-size:calc(var(--pw)*.46);line-height:1.05;}
+  .pile-card.joker{background:linear-gradient(160deg,#fff6d6,#e8c24d);color:#7a5600;}
+  .pile-card .rj{font-size:calc(var(--pw)*.2);font-weight:900;}
+  .pile-cluster.active .pile-card{--pw:calc(var(--pw-base,46px)*1.18);}
+  .trick-chip{font-size:.7rem;}
+
+  /* ヘッダー */
+  .topbar{min-height:42px;}
+  .topbar .lang-switch{margin:0;}
+  .topbar .lang-btn{padding:4px 10px;font-size:.68rem;}
+  @media (min-width:900px){
+    #app{max-width:1100px;margin:0 auto;width:100%;}
+    .arena{min-height:430px;}
+    :root{--pw:56px;}
+  }
+  @media (max-width:480px){
+    .arena{min-height:360px;}
+    .seat{min-width:92px;padding:8px 10px 18px;}
+    .field-zone{width:94%;height:210px;}
+  }
+
+
+  .lock-strip{border-radius:0;margin:0;padding:7px 12px;font-size:.8rem;animation:none;box-shadow:0 2px 8px rgba(0,0,0,.25);}
+  .card.joker .center-suit{inset:auto;right:calc(var(--cw)*.08);bottom:calc(var(--cw)*.06);left:auto;top:auto;display:block;
+    font-size:calc(var(--cw)*.55);}
+  .hand-panel{padding-bottom:26px;}
+  .hand-panel .hint-line:last-child{margin-top:10px;}
   /* ダブルタップ/ダブルクリックによる拡大・テキスト選択を防止 */
   html,body{touch-action:manipulation;-webkit-touch-callout:none;-webkit-text-size-adjust:100%;}
   body{-webkit-user-select:none;user-select:none;}
@@ -1506,30 +1597,53 @@ function reorderHand(player, srcId, targetId){
   const [moved]=player.hand.splice(srcIdx,1);
   player.hand.splice(tgtIdx,0,moved);
 }
+function currentCardWidth(){
+  const w=(typeof window!=='undefined'?window.innerWidth:400);
+  return w>=1000?72 : w>=700?64 : w>=420?56 : 52;
+}
+function applyCardSize(){
+  try{
+    const cw=currentCardWidth();
+    document.documentElement.style.setProperty('--cw',cw+'px');
+    document.documentElement.style.setProperty('--pw',Math.round(cw*0.9)+'px');
+    document.documentElement.style.setProperty('--pw-base',Math.round(cw*0.9)+'px');
+  }catch(e){}
+}
 function buildFanRow(cards, optsFn){
-  const row=el('div',{class:'hand-row-fan'});
   const n=cards.length;
-  const cardWidth=50;
-  const minVisible=24;
-  const targetWidth=Math.min((typeof window!=='undefined'?window.innerWidth:400)-40, 640);
-  let overlap=0;
-  if(n>1){
-    overlap=Math.max(0,(cardWidth*n-targetWidth)/(n-1));
-    overlap=Math.min(overlap,cardWidth-minVisible);
+  const cw=currentCardWidth();
+  const avail=Math.min((typeof window!=='undefined'?window.innerWidth:400)-32, 980);
+  const minVisible=Math.round(cw*0.52); // 隣のカードに重なっても数字とマークが読める幅
+  // 1段で収まらない場合は2段・3段に分けて、重なりを最小限にする
+  let rows=1;
+  while(rows<4 && cw+(Math.ceil(n/rows)-1)*minVisible>avail) rows++;
+  const perRow=Math.ceil(n/rows);
+  const wrap=el('div',{class:'hand-rows'});
+  for(let r=0;r<rows;r++){
+    const slice=cards.slice(r*perRow,(r+1)*perRow);
+    if(slice.length===0) continue;
+    const row=el('div',{class:'hand-row-fan'});
+    const m=slice.length;
+    let overlap=0;
+    if(m>1){
+      overlap=Math.max(0,(cw*m-avail)/(m-1));
+      overlap=Math.min(overlap,cw-minVisible);
+    }
+    slice.forEach((card,i)=>{
+      const c=cardEl(card, optsFn(card));
+      if(i>0) c.style.marginLeft=(-overlap)+'px';
+      c.style.zIndex=String(r*perRow+i);
+      row.appendChild(c);
+    });
+    wrap.appendChild(row);
   }
-  cards.forEach((card,i)=>{
-    const c=cardEl(card, optsFn(card));
-    if(i>0) c.style.marginLeft=(-overlap)+'px';
-    c.style.zIndex=String(i);
-    row.appendChild(c);
-  });
-  return row;
+  return wrap;
 }
 function cardEl(card,{selected=false,onClick=null,draggable=false}={}){
   const cls=['card']; if(isRed(card.suit)) cls.push('red'); if(card.rank==='JOKER') cls.push('joker'); if(selected) cls.push('selected');
   const c=el('div',{class:cls.join(' ')});
   const corner=el('div',{class:'corner'});
-  if(card.rank==='JOKER'){ corner.appendChild(el('div',{class:'r',text:'JO'})); corner.appendChild(el('div',{class:'s',text:'★'})); }
+  if(card.rank==='JOKER'){ corner.appendChild(el('div',{class:'r',text:'JOKER'})); corner.appendChild(el('div',{class:'s',text:'★'})); }
   else { corner.appendChild(el('div',{class:'r',text:card.rank})); corner.appendChild(el('div',{class:'s',text:card.suit})); }
   c.appendChild(corner);
   c.appendChild(el('div',{class:'center-suit',text: card.rank==='JOKER'?'★':card.suit}));
@@ -1578,16 +1692,18 @@ function miniHandFan(count){
     b.style.left=(i*8)+'px'; b.style.zIndex=i;
     wrap.appendChild(b);
   }
-  wrap.appendChild(el('div',{class:'mini-count-badge',text:count+t('countSuffix')}));
+  wrap.appendChild(el('div',{class:'mini-count-badge'+(count<=2?' few':''),text:count+t('countSuffix')}));
   return wrap;
 }
 function seededRand(seed){ const x=Math.sin(seed*12.9898)*43758.5453; return x-Math.floor(x); }
 function pileCluster(entry, idx, activeIdx){
   const seed=idx*17+3;
-  const baseX=(seededRand(seed)-0.5)*150;
-  const baseY=(seededRand(seed+1)-0.5)*70;
-  const baseRot=(seededRand(seed+2)-0.5)*22;
   const isActive=idx===activeIdx;
+  // 直近の1手は中央に大きく。過去の手は左右へ少しずらして薄く表示する
+  const side=(seededRand(seed)<0.5?-1:1);
+  const baseX= isActive ? 0 : side*(70+seededRand(seed+3)*40);
+  const baseY= isActive ? 8 : (seededRand(seed+1)-0.5)*50;
+  const baseRot= isActive ? 0 : (seededRand(seed+2)-0.5)*26;
   const wrap=el('div',{class:'pile-cluster'+(isActive?' active':'')});
   wrap.style.left=`calc(50% + ${baseX}px)`;
   wrap.style.top=`calc(50% + ${baseY}px)`;
@@ -1790,8 +1906,6 @@ function renderTable(root){
   const selfIndex = selfMode ? 0 : state.currentIndex;
   const actor=state.players[selfIndex];
 
-  root.appendChild(buildLangSwitch('game-lang-switch'));
-
   const topbar=el('div',{class:'topbar'});
   topbar.appendChild(el('div',{class:'title',text:t('roundTitle',state.roundNumber)}));
   const badges=el('div',{class:'badge-row'});
@@ -1801,6 +1915,7 @@ function renderTable(root){
   if(effectiveReversed()) badges.appendChild(el('div',{class:'badge on',text:t('reversedBadge')}));
   if(state.lockSeq) badges.appendChild(el('div',{class:'badge on',text:t('gekiBadge',state.lockSeq.suits.join(''),state.lockSeq.rank)}));
   else if(state.lockSuits) badges.appendChild(el('div',{class:'badge on',text:t('lockBadge',state.lockSuits.join(''))}));
+  badges.appendChild(buildLangSwitch());
   topbar.appendChild(badges);
   root.appendChild(topbar);
 
@@ -1814,7 +1929,10 @@ function renderTable(root){
     if(x.p.finished) cls.push('done');
     if(x.i===state.currentIndex && !x.p.finished) cls.push('current');
     const seat=el('div',{class:cls.join(' ')});
-    seat.appendChild(el('div',{class:'face',text:x.p.name.slice(0,1)}));
+    const faceEl=el('div',{class:'face',text:x.p.name.slice(0,1)});
+    const hue=[160,28,205,300,50][x.i%5];
+    faceEl.style.background=`linear-gradient(160deg,hsl(${hue},45%,42%),hsl(${hue},50%,26%))`;
+    seat.appendChild(faceEl);
     seat.appendChild(el('div',{class:'sname',text:x.p.name+(x.p.isCPU?' 🤖':'')}));
     if(x.p.finished){
       const pos2=state.finishOrder.indexOf(x.i);
@@ -1828,10 +1946,11 @@ function renderTable(root){
   });
 
   const fieldZone=el('div',{class:'field-zone'});
+  let lockStrip=null;
   if(state.lockSeq){
-    fieldZone.appendChild(el('div',{class:'lock-banner',text:t('gekiBanner',state.lockSeq.suits.join(''),state.lockSeq.rank,t('gekiShape',state.lockSeq.count))}));
+    lockStrip=el('div',{class:'lock-banner lock-strip',text:t('gekiBanner',state.lockSeq.suits.join(''),state.lockSeq.rank,t('gekiShape',state.lockSeq.count))});
   } else if(state.lockSuits){
-    fieldZone.appendChild(el('div',{class:'lock-banner',text:t('lockBanner',state.lockSuits.join('/'))}));
+    lockStrip=el('div',{class:'lock-banner lock-strip',text:t('lockBanner',state.lockSuits.join('/'))});
   }
   if(state.field===null){
     fieldZone.appendChild(el('div',{class:'field-empty',text:t('fieldEmpty')}));
@@ -1853,12 +1972,13 @@ function renderTable(root){
   }
   fieldZone.appendChild(el('div',{class:'log-line',text:state.log}));
   arena.appendChild(fieldZone);
+  if(lockStrip) root.appendChild(lockStrip);
   root.appendChild(arena);
 
   if(state.mode==='practice') root.appendChild(renderHintPanel());
 
-  const panel=el('div',{class:'hand-panel'});
   const isMyTurnNow = state.screen==='play' && state.currentIndex===selfIndex;
+  const panel=el('div',{class:'hand-panel'+(isMyTurnNow?' myturn':'')});
 
   if(state.screen==='give' || state.screen==='discard'){
     const gActor=state.players[state.pendingActor];
@@ -2039,6 +2159,7 @@ function renderJokerChoiceModal(root){
 }
 
 function render(){
+  applyCardSize();
   const root=document.getElementById('app'); root.innerHTML='';
   if(state.screen==='setup') renderSetup(root);
   else if(state.screen==='reveal') renderReveal(root);
