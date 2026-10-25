@@ -351,6 +351,20 @@
   .result-btns{flex-wrap:wrap;}
   .result-btns .btn{flex:1 1 150px;white-space:nowrap;padding:13px 10px;}
   @media (max-width:420px){ .result-btns .btn{flex-basis:100%;} }
+
+  /* ===== 手札は1列・マークは1つ(数字+マークを左上にまとめる) ===== */
+  .card .center-suit{display:none;}
+  .card.joker .center-suit{display:flex;inset:auto;right:calc(var(--cw)*.1);bottom:calc(var(--cw)*.08);left:auto;top:auto;font-size:calc(var(--cw)*.5);}
+  .card .corner{top:calc(var(--cw)*.06);left:50%;transform:translateX(-50%);}
+  .hand-rows .hand-row-fan .card .corner{left:calc(var(--vis,var(--cw))*.5);}
+  .card .corner .r{font-size:min(calc(var(--cw)*.4),calc(var(--vis,var(--cw))*.82));letter-spacing:-.06em;}
+  .card .corner .s{font-size:min(calc(var(--cw)*.4),calc(var(--vis,var(--cw))*.86));line-height:1;}
+  .card.joker .corner .r{font-size:min(calc(var(--cw)*.22),calc(var(--vis,var(--cw))*.6));letter-spacing:.04em;}
+  .hand-row-fan{padding-top:calc(var(--cw)*.4);}
+
+  /* 場の整理: 直近3手だけ表示、ログは最新3件 */
+  .field-zone{top:45%;}
+  @media (max-width:480px){ .arena{min-height:410px;} .field-zone{height:230px;} .trick-chip{font-size:.66rem;padding:2px 7px;} }
   /* ダブルタップ/ダブルクリックによる拡大・テキスト選択を防止 */
   html,body{touch-action:manipulation;-webkit-touch-callout:none;-webkit-text-size-adjust:100%;}
   body{-webkit-user-select:none;user-select:none;}

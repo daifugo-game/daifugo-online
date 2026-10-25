@@ -327,7 +327,7 @@ function cardEl(card, {selected=false, onClick=null}={}){
 }
 function currentCardWidth(){
   const w=(typeof window!=='undefined'?window.innerWidth:400);
-  return w>=1000?72 : w>=700?64 : w>=420?56 : 52;
+  return w>=1000?72 : w>=700?64 : w>=420?60 : 56;
 }
 function applyCardSize(){
   try{
@@ -341,7 +341,7 @@ function buildFanRow(cards, optsFn){
   const n=cards.length;
   const cw=currentCardWidth();
   const avail=Math.min((typeof window!=='undefined'?window.innerWidth:400)-32, 980);
-  const minVisible=Math.round(cw*0.52); // 隣のカードに重なっても数字とマークが読める幅
+  const minVisible=Math.max(20,Math.round(cw*0.38)); // 隣のカードに重なっても数字とマークが読める最小幅(できるだけ1列に収める)
   // 1段で収まらない場合は2段・3段に分けて、重なりを最小限にする
   let rows=1;
   while(rows<4 && cw+(Math.ceil(n/rows)-1)*minVisible>avail) rows++;
@@ -357,6 +357,7 @@ function buildFanRow(cards, optsFn){
       overlap=Math.max(0,(cw*m-avail)/(m-1));
       overlap=Math.min(overlap,cw-minVisible);
     }
+    row.style.setProperty('--vis',(cw-overlap)+'px'); // 重なった後に見えている幅(数字とマークの大きさの基準)
     slice.forEach((card,i)=>{
       const c=cardEl(card, optsFn(card));
       if(i>0) c.style.marginLeft=(-overlap)+'px';
@@ -393,9 +394,10 @@ function pileCluster(entry, idx, activeIdx){
   const seed=idx*17+3;
   const isActive=idx===activeIdx;
   const side=(seededRand(seed)<0.5?-1:1);
-  const baseX= isActive ? 0 : side*(70+seededRand(seed+3)*40);
-  const baseY= isActive ? 8 : (seededRand(seed+1)-0.5)*50;
-  const baseRot= isActive ? 0 : (seededRand(seed+2)-0.5)*26;
+  const back = (activeIdx-idx); // 1=ひとつ前, 2=ふたつ前
+  const baseX= isActive ? 0 : (back===1 ? -1 : 1)*96;
+  const baseY= isActive ? 8 : -14;
+  const baseRot= isActive ? 0 : (back===1 ? -9 : 9);
   const wrap=el('div',{class:'pile-cluster'+(isActive?' active':'')});
   wrap.style.left=`calc(50% + ${baseX}px)`;
   wrap.style.top=`calc(50% + ${baseY}px)`;
@@ -590,13 +592,13 @@ function renderGame(root){
   } else {
     const fc = el('div',{class:'field-cards'});
     const playEntries = (st.trickHistory||[]).filter(h=>h.kind==='play');
-    const visible = playEntries.slice(-8);
+    const visible = playEntries.slice(-3);
     const activeIdx = visible.length-1;
     visible.forEach((entry,i)=>fc.appendChild(pileCluster(entry,i,activeIdx)));
     fieldZone.appendChild(fc);
     if(st.trickHistory && st.trickHistory.length){
       const logRow = el('div',{class:'trick-log'});
-      st.trickHistory.forEach(h=>{
+      st.trickHistory.slice(-3).forEach(h=>{
         const label = h.kind==='pass' ? t('passChip', h.name) : `${h.name}: ${describePlayLike(h)}`;
         logRow.appendChild(el('div',{class:'trick-chip'+(h.kind==='pass'?' pass':''), text:label}));
       });

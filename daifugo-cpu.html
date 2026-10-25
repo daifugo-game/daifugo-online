@@ -307,6 +307,20 @@
   .result-btns{flex-wrap:wrap;}
   .result-btns .btn{flex:1 1 150px;white-space:nowrap;padding:13px 10px;}
   @media (max-width:420px){ .result-btns .btn{flex-basis:100%;} }
+
+  /* ===== 手札は1列・マークは1つ(数字+マークを左上にまとめる) ===== */
+  .card .center-suit{display:none;}
+  .card.joker .center-suit{display:flex;inset:auto;right:calc(var(--cw)*.1);bottom:calc(var(--cw)*.08);left:auto;top:auto;font-size:calc(var(--cw)*.5);}
+  .card .corner{top:calc(var(--cw)*.06);left:50%;transform:translateX(-50%);}
+  .hand-rows .hand-row-fan .card .corner{left:calc(var(--vis,var(--cw))*.5);}
+  .card .corner .r{font-size:min(calc(var(--cw)*.4),calc(var(--vis,var(--cw))*.82));letter-spacing:-.06em;}
+  .card .corner .s{font-size:min(calc(var(--cw)*.4),calc(var(--vis,var(--cw))*.86));line-height:1;}
+  .card.joker .corner .r{font-size:min(calc(var(--cw)*.22),calc(var(--vis,var(--cw))*.6));letter-spacing:.04em;}
+  .hand-row-fan{padding-top:calc(var(--cw)*.4);}
+
+  /* 場の整理: 直近3手だけ表示、ログは最新3件 */
+  .field-zone{top:45%;}
+  @media (max-width:480px){ .arena{min-height:410px;} .field-zone{height:230px;} .trick-chip{font-size:.66rem;padding:2px 7px;} }
   /* ダブルタップ/ダブルクリックによる拡大・テキスト選択を防止 */
   html,body{touch-action:manipulation;-webkit-touch-callout:none;-webkit-text-size-adjust:100%;}
   body{-webkit-user-select:none;user-select:none;}
@@ -1632,7 +1646,7 @@ function reorderHand(player, srcId, targetId){
 }
 function currentCardWidth(){
   const w=(typeof window!=='undefined'?window.innerWidth:400);
-  return w>=1000?72 : w>=700?64 : w>=420?56 : 52;
+  return w>=1000?72 : w>=700?64 : w>=420?60 : 56;
 }
 function applyCardSize(){
   try{
@@ -1646,7 +1660,7 @@ function buildFanRow(cards, optsFn){
   const n=cards.length;
   const cw=currentCardWidth();
   const avail=Math.min((typeof window!=='undefined'?window.innerWidth:400)-32, 980);
-  const minVisible=Math.round(cw*0.52); // 隣のカードに重なっても数字とマークが読める幅
+  const minVisible=Math.max(20,Math.round(cw*0.38)); // 隣のカードに重なっても数字とマークが読める最小幅(できるだけ1列に収める)
   // 1段で収まらない場合は2段・3段に分けて、重なりを最小限にする
   let rows=1;
   while(rows<4 && cw+(Math.ceil(n/rows)-1)*minVisible>avail) rows++;
@@ -1662,6 +1676,7 @@ function buildFanRow(cards, optsFn){
       overlap=Math.max(0,(cw*m-avail)/(m-1));
       overlap=Math.min(overlap,cw-minVisible);
     }
+    row.style.setProperty('--vis',(cw-overlap)+'px'); // 重なった後に見えている幅(数字とマークの大きさの基準)
     slice.forEach((card,i)=>{
       const c=cardEl(card, optsFn(card));
       if(i>0) c.style.marginLeft=(-overlap)+'px';
@@ -1755,9 +1770,10 @@ function pileCluster(entry, idx, activeIdx){
   const isActive=idx===activeIdx;
   // 直近の1手は中央に大きく。過去の手は左右へ少しずらして薄く表示する
   const side=(seededRand(seed)<0.5?-1:1);
-  const baseX= isActive ? 0 : side*(70+seededRand(seed+3)*40);
-  const baseY= isActive ? 8 : (seededRand(seed+1)-0.5)*50;
-  const baseRot= isActive ? 0 : (seededRand(seed+2)-0.5)*26;
+  const back = (activeIdx-idx); // 1=ひとつ前, 2=ふたつ前
+  const baseX= isActive ? 0 : (back===1 ? -1 : 1)*96;
+  const baseY= isActive ? 8 : -14;
+  const baseRot= isActive ? 0 : (back===1 ? -9 : 9);
   const wrap=el('div',{class:'pile-cluster'+(isActive?' active':'')});
   wrap.style.left=`calc(50% + ${baseX}px)`;
   wrap.style.top=`calc(50% + ${baseY}px)`;
@@ -2017,13 +2033,13 @@ function renderTable(root){
   } else {
     const fc=el('div',{class:'field-cards'});
     const playEntries=state.trickHistory.filter(h=>h.kind==='play');
-    const visible=playEntries.slice(-8);
+    const visible=playEntries.slice(-3);
     const activeIdx=visible.length-1;
     visible.forEach((entry,i)=>fc.appendChild(pileCluster(entry,i,activeIdx)));
     fieldZone.appendChild(fc);
     if(state.trickHistory.length){
       const logRow=el('div',{class:'trick-log'});
-      state.trickHistory.forEach(h=>{
+      state.trickHistory.slice(-3).forEach(h=>{
         const label=h.kind==='pass' ? t('passChip',h.name) : `${h.name}: ${describePlay(h)}`;
         logRow.appendChild(el('div',{class:'trick-chip'+(h.kind==='pass'?' pass':''),text:label}));
       });
