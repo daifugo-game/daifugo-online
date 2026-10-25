@@ -367,6 +367,27 @@ function buildFanRow(cards, optsFn){
   }
   return wrap;
 }
+
+function launchConfetti(){
+  try{
+    const layer=document.createElement('div'); layer.className='confetti-layer';
+    const glyphs=['♠','♥','♦','♣','★'];
+    for(let i=0;i<26;i++){
+      const s=document.createElement('span'); s.className='confetti-piece';
+      s.textContent=glyphs[i%glyphs.length];
+      s.style.left=(Math.random()*100)+'vw';
+      s.style.color=(i%2? '#e8cf7a':'#f4efe0');
+      if(i%4===1) s.style.color='#e0654f';
+      s.style.animationDelay=(Math.random()*0.9)+'s';
+      s.style.fontSize=(16+Math.random()*16)+'px';
+      layer.appendChild(s);
+    }
+    document.body.appendChild(layer);
+    setTimeout(()=>{ if(layer.parentNode) layer.parentNode.removeChild(layer); },4800);
+  }catch(e){}
+}
+let __enterDir=null;
+const ENTER_DIRS={tl:[-130,-90],tr:[130,-90],bl:[-130,70],br:[130,70],tc:[0,-110],self:[0,150]};
 function seededRand(seed){ const x=Math.sin(seed*12.9898)*43758.5453; return x-Math.floor(x); }
 function pileCluster(entry, idx, activeIdx){
   const seed=idx*17+3;
@@ -392,6 +413,7 @@ function pileCluster(entry, idx, activeIdx){
     else { c.appendChild(el('div',{class:'r',text:card.rank})); c.appendChild(el('div',{class:'s',text:card.suit})); }
     cardsWrap.appendChild(c);
   });
+  if(isActive && __enterDir){ const d=ENTER_DIRS[__enterDir]||[0,0]; cardsWrap.classList.add('enter'); cardsWrap.style.setProperty('--fx',d[0]+'px'); cardsWrap.style.setProperty('--fy',d[1]+'px'); }
   wrap.appendChild(cardsWrap);
   return wrap;
 }
@@ -553,6 +575,11 @@ function renderGame(root){
     arena.appendChild(seat);
   });
 
+  { const th=st.trickHistory||[], lastH=th[th.length-1], key=st.roundNumber+':'+th.length;
+    if(lastH && lastH.kind==='play' && key!==app.__animKey && lastH.playerIndex!==undefined){
+      __enterDir = lastH.playerIndex===myId ? 'self' : seatSlotForIndex(lastH.playerIndex,n);
+    } else __enterDir=null;
+    app.__animKey=key; }
   const fieldZone = el('div',{class:'field-zone'});
   let lockStrip=null;
   if(st.lockSeq) lockStrip=el('div',{class:'lock-banner lock-strip', text:t('gekiBanner', st.lockSeq.suits.join(''), st.lockSeq.rank, st.lockSeq.count)});
@@ -725,8 +752,9 @@ function renderResult(root, st){
   if(hasFouls) st.pendingFoulPenalties.forEach(fp=>{ foulPtByPlayer[fp.playerId]=fp.penaltyPoints; });
   st.finishOrder.forEach((idx,pos)=>{
     const p = st.players[idx];
-    const row = el('div',{class:'rank-row'});
-    row.appendChild(el('div',{class:'num', text:(pos+1)+'.'}));
+    const row = el('div',{class:'rank-row r'+(pos+1)+(pos===0?' first':'')+((pos===st.finishOrder.length-1&&pos>0)?' last':'')});
+    row.style.setProperty('--i',pos);
+    row.appendChild(el('div',{class:'num', text:String(pos+1)}));
     row.appendChild(el('div',{class:'rname', text:p.name}));
     row.appendChild(el('div',{class:'rtitle', text:labels[pos]}));
     let pt=0;
@@ -753,6 +781,7 @@ function renderResult(root, st){
     card.appendChild(el('div',{class:'waiting-msg', text:t('waitingNextRound')}));
   }
   wrap.appendChild(card); root.appendChild(wrap);
+  if(st.finishOrder[0]===app.me.playerId && app.__confettiRound!==st.roundNumber && !(st.pendingFoulPenalties&&st.pendingFoulPenalties.some(f=>f.playerId===app.me.playerId))){ app.__confettiRound=st.roundNumber; launchConfetti(); }
 }
 
 function renderRulesModal(root){

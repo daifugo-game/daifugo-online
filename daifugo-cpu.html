@@ -274,6 +274,39 @@
     font-size:calc(var(--cw)*.55);}
   .hand-panel{padding-bottom:26px;}
   .hand-panel .hint-line:last-child{margin-top:10px;}
+
+  /* ===== 出しアニメーション・結果画面 ===== */
+  @keyframes playIn{0%{transform:translate(var(--fx,0),var(--fy,0)) scale(.55) rotate(-8deg);opacity:0;}
+    60%{opacity:1;}100%{transform:translate(0,0) scale(1) rotate(0);opacity:1;}}
+  .pile-cards.enter{animation:playIn .34s cubic-bezier(.2,.9,.3,1.15) both;}
+  .card{transition:transform .16s cubic-bezier(.3,1.4,.5,1),box-shadow .16s;}
+  .btn:active:not(:disabled){transform:scale(.97);}
+  @keyframes rowIn{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:none;}}
+  @keyframes shine{0%{background-position:-200% 0;}100%{background-position:200% 0;}}
+  @keyframes confettiFall{0%{transform:translateY(-30px) rotate(0);opacity:0;}10%{opacity:1;}
+    100%{transform:translateY(110vh) rotate(540deg);opacity:.9;}}
+  .confetti-layer{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:70;}
+  .confetti-piece{position:absolute;top:-30px;font-size:22px;animation:confettiFall 3.4s ease-in forwards;}
+  .result-card h2{font-size:1.7rem;letter-spacing:.06em;}
+  .rank-row{display:grid;grid-template-columns:44px 1fr auto;grid-template-areas:"num name pt" "num title total";
+    column-gap:12px;row-gap:1px;align-items:center;padding:12px 14px;animation:rowIn .45s both;animation-delay:calc(var(--i,0)*110ms + 150ms);}
+  .rank-row .num{grid-area:num;width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font-size:1.05rem;font-weight:900;color:var(--felt-dark);background:#8a9a90;font-family:'Zen Kaku Gothic New',sans-serif;}
+  .rank-row .rname{grid-area:name;font-size:1rem;overflow-wrap:anywhere;}
+  .rank-row .rtitle{grid-area:title;margin:0;font-size:.78rem;}
+  .rank-row .rpt{grid-area:pt;text-align:right;font-size:1.05rem;}
+  .rank-row .rtotal{grid-area:total;text-align:right;font-size:.72rem;}
+  .rank-row.r1 .num{background:linear-gradient(160deg,#fff0b3,#d9a91e);box-shadow:0 0 12px rgba(232,207,122,.6);}
+  .rank-row.r2 .num{background:linear-gradient(160deg,#f1f3f4,#aab3b8);}
+  .rank-row.r3 .num{background:linear-gradient(160deg,#f1c9a0,#b57a43);}
+  .rank-row.first{border-color:var(--gold);background:linear-gradient(100deg,rgba(201,162,39,.22),rgba(201,162,39,.06));
+    box-shadow:0 0 0 1px rgba(232,207,122,.4),0 6px 20px rgba(201,162,39,.2);}
+  .rank-row.first .rname::after{content:' 👑';}
+  .rank-row.first .rtitle{font-size:.86rem;}
+  .rank-row.last{opacity:.9;}
+  .result-btns{flex-wrap:wrap;}
+  .result-btns .btn{flex:1 1 150px;white-space:nowrap;padding:13px 10px;}
+  @media (max-width:420px){ .result-btns .btn{flex-basis:100%;} }
   /* ダブルタップ/ダブルクリックによる拡大・テキスト選択を防止 */
   html,body{touch-action:manipulation;-webkit-touch-callout:none;-webkit-text-size-adjust:100%;}
   body{-webkit-user-select:none;user-select:none;}
@@ -1695,6 +1728,27 @@ function miniHandFan(count){
   wrap.appendChild(el('div',{class:'mini-count-badge'+(count<=2?' few':''),text:count+t('countSuffix')}));
   return wrap;
 }
+
+function launchConfetti(){
+  try{
+    const layer=document.createElement('div'); layer.className='confetti-layer';
+    const glyphs=['♠','♥','♦','♣','★'];
+    for(let i=0;i<26;i++){
+      const s=document.createElement('span'); s.className='confetti-piece';
+      s.textContent=glyphs[i%glyphs.length];
+      s.style.left=(Math.random()*100)+'vw';
+      s.style.color=(i%2? '#e8cf7a':'#f4efe0');
+      if(i%4===1) s.style.color='#e0654f';
+      s.style.animationDelay=(Math.random()*0.9)+'s';
+      s.style.fontSize=(16+Math.random()*16)+'px';
+      layer.appendChild(s);
+    }
+    document.body.appendChild(layer);
+    setTimeout(()=>{ if(layer.parentNode) layer.parentNode.removeChild(layer); },4800);
+  }catch(e){}
+}
+let __enterDir=null;
+const ENTER_DIRS={tl:[-130,-90],tr:[130,-90],bl:[-130,70],br:[130,70],tc:[0,-110],self:[0,150]};
 function seededRand(seed){ const x=Math.sin(seed*12.9898)*43758.5453; return x-Math.floor(x); }
 function pileCluster(entry, idx, activeIdx){
   const seed=idx*17+3;
@@ -1721,6 +1775,7 @@ function pileCluster(entry, idx, activeIdx){
     else { c.appendChild(el('div',{class:'r',text:card.rank})); c.appendChild(el('div',{class:'s',text:card.suit})); }
     cardsWrap.appendChild(c);
   });
+  if(isActive && __enterDir){ const d=ENTER_DIRS[__enterDir]||[0,0]; cardsWrap.classList.add('enter'); cardsWrap.style.setProperty('--fx',d[0]+'px'); cardsWrap.style.setProperty('--fy',d[1]+'px'); }
   wrap.appendChild(cardsWrap);
   return wrap;
 }
@@ -1945,6 +2000,11 @@ function renderTable(root){
     arena.appendChild(seat);
   });
 
+  { const th=state.trickHistory, lastH=th[th.length-1], key=state.roundNumber+':'+th.length;
+    if(lastH && lastH.kind==='play' && key!==state.__animKey && lastH.playerIndex!==undefined){
+      __enterDir = lastH.playerIndex===selfIndex ? 'self' : seatSlotForIndex(lastH.playerIndex,n);
+    } else __enterDir=null;
+    state.__animKey=key; }
   const fieldZone=el('div',{class:'field-zone'});
   let lockStrip=null;
   if(state.lockSeq){
@@ -2069,8 +2129,9 @@ function renderResult(root){
   if(hasFouls) state.pendingFoulPenalties.forEach(fp=>{ foulPtByPlayer[fp.playerId]=fp.penaltyPoints; });
   state.finishOrder.forEach((idx,pos)=>{
     const p=state.players[idx];
-    const row=el('div',{class:'rank-row'});
-    row.appendChild(el('div',{class:'num',text:(pos+1)+'.'}));
+    const row=el('div',{class:'rank-row r'+(pos+1)+(pos===0?' first':'')+(pos===state.finishOrder.length-1&&pos>0?' last':'')});
+    row.style.setProperty('--i',pos);
+    row.appendChild(el('div',{class:'num',text:String(pos+1)}));
     row.appendChild(el('div',{class:'rname',text:p.name}));
     row.appendChild(el('div',{class:'rtitle',text:labels[pos]}));
     let pt=0;
@@ -2094,6 +2155,7 @@ function renderResult(root){
   btns.appendChild(el('button',{class:'btn pass',text:t('noEndHere'),onclick:resetGame}));
   card.appendChild(btns);
   wrap.appendChild(card); root.appendChild(wrap);
+  if(state.finishOrder[0]===0 && state.__confettiRound!==state.roundNumber && !(state.pendingFoulPenalties&&state.pendingFoulPenalties.some(f=>f.playerId===0))){ state.__confettiRound=state.roundNumber; launchConfetti(); }
 }
 
 function renderRulesModal(root){
