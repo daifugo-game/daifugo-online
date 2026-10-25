@@ -228,6 +228,96 @@
   .rules-modal-box{padding:16px 14px 28px;}
 }
 
+  /* ===== UI刷新(カードの視認性 / 場の主役化 / 手番の明示) ===== */
+  :root{ --cw:54px; --pw:46px; --ink2:#1b1916; --red2:#c4262e; }
+  .card{width:var(--cw);height:calc(var(--cw)*1.42);border-radius:calc(var(--cw)*.14);color:var(--ink2);
+    background:linear-gradient(180deg,#fffdf6,#f6efdc);border:1px solid rgba(0,0,0,.22);
+    box-shadow:0 2px 5px rgba(0,0,0,.32),inset 0 1px 0 rgba(255,255,255,.9);}
+  .card.red{color:var(--red2);}
+  .card .corner{top:calc(var(--cw)*.07);left:calc(var(--cw)*.09);}
+  .card .corner .r{font-size:calc(var(--cw)*.36);font-weight:900;letter-spacing:-.04em;}
+  .card .corner .s{font-size:calc(var(--cw)*.34);margin-top:0;}
+  .card .center-suit{inset:auto;right:calc(var(--cw)*.08);bottom:calc(var(--cw)*.06);left:auto;top:auto;
+    font-size:calc(var(--cw)*.62);opacity:.9;line-height:1;}
+  .card.joker{background:linear-gradient(160deg,#fff6d6 0%,#f3d77b 55%,#e2b93f 100%);color:#7a5600;border-color:#b98a12;}
+  .card.joker .corner .r{writing-mode:vertical-rl;font-size:calc(var(--cw)*.2);letter-spacing:.06em;font-weight:900;}
+  .card.joker .corner .s{display:none;}
+  .card.joker .center-suit{inset:0;right:auto;bottom:auto;display:flex;align-items:center;justify-content:center;
+    font-size:calc(var(--cw)*.8);opacity:1;filter:drop-shadow(0 1px 1px rgba(255,255,255,.7));color:#a77800;}
+  .card.selected{transform:translateY(calc(var(--cw)*-.3));
+    box-shadow:0 10px 18px rgba(0,0,0,.45),0 0 0 3px var(--gold),0 0 14px 2px rgba(232,207,122,.7);}
+  .hand-rows{display:flex;flex-direction:column;gap:2px;}
+  .hand-row-fan{justify-content:center;padding:calc(var(--cw)*.34) 4px 6px;overflow:visible;}
+
+  /* 手番の明示 */
+  .hand-panel{transition:box-shadow .25s,border-color .25s;border-top:2px solid transparent;}
+  .hand-panel.myturn{border-top-color:var(--gold);box-shadow:0 -8px 28px rgba(201,162,39,.28);
+    background:linear-gradient(180deg,rgba(201,162,39,.14),rgba(0,0,0,.18) 60%);}
+  .hand-panel.myturn .htitle{color:var(--felt-dark);background:var(--gold-soft);font-weight:900;padding:3px 12px;border-radius:999px;font-size:.82rem;}
+  .hand-head .hscore{font-size:.9rem;}
+  .btn.play:not(:disabled){box-shadow:0 0 0 2px rgba(232,207,122,.5),0 6px 16px rgba(201,162,39,.4);}
+  .btn.play:disabled{background:rgba(255,255,255,.07);color:var(--muted-dim);opacity:1;box-shadow:none;border:1px solid var(--felt-line);}
+  .btn:disabled{opacity:.6;}
+  .btn.pass:disabled,.btn.clear:disabled{opacity:.4;}
+  .hint-line{font-size:.8rem;color:var(--muted);}
+
+  /* 相手席 */
+  .seat{min-width:104px;padding:10px 14px 18px;}
+  .seat .sname{font-size:.86rem;}
+  .seat .sscore{font-size:.74rem;}
+  .face{width:42px;height:42px;font-size:1.1rem;color:#fff;border:2px solid rgba(255,255,255,.25);}
+  .seat.current{border-color:var(--gold);background:rgba(201,162,39,.18);
+    box-shadow:0 0 0 2px rgba(232,207,122,.55),0 0 22px rgba(201,162,39,.45);animation:seatPulse 1.4s ease-in-out infinite;}
+  .seat.current .sname{color:var(--gold-soft);}
+  @keyframes seatPulse{0%,100%{box-shadow:0 0 0 2px rgba(232,207,122,.55),0 0 14px rgba(201,162,39,.35);}50%{box-shadow:0 0 0 3px rgba(232,207,122,.8),0 0 26px rgba(201,162,39,.6);}}
+  .mini-fan{margin-bottom:16px;}
+  .mini-count-badge{right:auto;left:50%;transform:translateX(-50%);bottom:-19px;font-size:.78rem;padding:2px 9px;border-radius:10px;white-space:nowrap;}
+  .mini-count-badge.few{background:#e0654f;color:#fff;}
+
+  /* 場(テーブル中央) */
+  .field-zone{width:min(86%,520px);height:230px;}
+  .field-zone::before{content:'';position:absolute;inset:0;border-radius:50%;
+    background:radial-gradient(ellipse at center,rgba(255,255,255,.07),rgba(255,255,255,0) 68%);
+    border:1.5px dashed rgba(255,255,255,.16);pointer-events:none;}
+  .field-empty{color:var(--cream);opacity:.78;font-size:.98rem;letter-spacing:.06em;position:relative;max-width:78%;line-height:1.5;}
+  .field-cards{height:170px;}
+  .log-line{font-size:.82rem;color:var(--cream);opacity:.85;position:relative;}
+  .pile-cluster:not(.active){opacity:.5;}
+  .pile-cluster.active{filter:none;}
+  .pile-cluster.active .pile-cards{filter:drop-shadow(0 0 10px rgba(232,207,122,.85));}
+  .pile-tag{font-size:.74rem;padding:2px 10px;margin-bottom:5px;background:rgba(0,0,0,.55);color:var(--cream);}
+  .pile-cluster.active .pile-tag{background:var(--gold);color:var(--felt-dark);font-weight:900;font-size:.82rem;}
+  .pile-card{width:var(--pw);height:calc(var(--pw)*1.42);border-radius:calc(var(--pw)*.14);margin-left:calc(var(--pw)*-.3);
+    background:linear-gradient(180deg,#fffdf6,#f6efdc);color:var(--ink2);}
+  .pile-card.red{color:var(--red2);}
+  .pile-card .r{font-size:calc(var(--pw)*.42);font-weight:900;line-height:1;}
+  .pile-card .s{font-size:calc(var(--pw)*.46);line-height:1.05;}
+  .pile-card.joker{background:linear-gradient(160deg,#fff6d6,#e8c24d);color:#7a5600;}
+  .pile-card .rj{font-size:calc(var(--pw)*.2);font-weight:900;}
+  .pile-cluster.active .pile-card{--pw:calc(var(--pw-base,46px)*1.18);}
+  .trick-chip{font-size:.7rem;}
+
+  /* ヘッダー */
+  .topbar{min-height:42px;}
+  .topbar .lang-switch{margin:0;}
+  .topbar .lang-btn{padding:4px 10px;font-size:.68rem;}
+  @media (min-width:900px){
+    #app{max-width:1100px;margin:0 auto;width:100%;}
+    .arena{min-height:430px;}
+    :root{--pw:56px;}
+  }
+  @media (max-width:480px){
+    .arena{min-height:360px;}
+    .seat{min-width:92px;padding:8px 10px 18px;}
+    .field-zone{width:94%;height:210px;}
+  }
+
+
+  .lock-strip{border-radius:0;margin:0;padding:7px 12px;font-size:.8rem;animation:none;box-shadow:0 2px 8px rgba(0,0,0,.25);}
+  .card.joker .center-suit{inset:auto;right:calc(var(--cw)*.08);bottom:calc(var(--cw)*.06);left:auto;top:auto;display:block;
+    font-size:calc(var(--cw)*.55);}
+  .hand-panel{padding-bottom:26px;}
+  .hand-panel .hint-line:last-child{margin-top:10px;}
   /* ダブルタップ/ダブルクリックによる拡大・テキスト選択を防止 */
   html,body{touch-action:manipulation;-webkit-touch-callout:none;-webkit-text-size-adjust:100%;}
   body{-webkit-user-select:none;user-select:none;}

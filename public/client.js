@@ -313,7 +313,7 @@ function cardFace(card){
   const cls=['card']; if(isRed(card.suit)) cls.push('red'); if(card.rank==='JOKER') cls.push('joker');
   const c = el('div',{class:cls.join(' ')});
   const corner = el('div',{class:'corner'});
-  if(card.rank==='JOKER'){ corner.appendChild(el('div',{class:'r',text:'JO'})); corner.appendChild(el('div',{class:'s',text:'★'})); }
+  if(card.rank==='JOKER'){ corner.appendChild(el('div',{class:'r',text:'JOKER'})); corner.appendChild(el('div',{class:'s',text:'★'})); }
   else { corner.appendChild(el('div',{class:'r',text:card.rank})); corner.appendChild(el('div',{class:'s',text:card.suit})); }
   c.appendChild(corner);
   c.appendChild(el('div',{class:'center-suit', text: card.rank==='JOKER'?'★':card.suit}));
@@ -325,38 +325,56 @@ function cardEl(card, {selected=false, onClick=null}={}){
   if(onClick) c.addEventListener('click', onClick);
   return c;
 }
+function currentCardWidth(){
+  const w=(typeof window!=='undefined'?window.innerWidth:400);
+  return w>=1000?72 : w>=700?64 : w>=420?56 : 52;
+}
+function applyCardSize(){
+  try{
+    const cw=currentCardWidth();
+    document.documentElement.style.setProperty('--cw',cw+'px');
+    document.documentElement.style.setProperty('--pw',Math.round(cw*0.9)+'px');
+    document.documentElement.style.setProperty('--pw-base',Math.round(cw*0.9)+'px');
+  }catch(e){}
+}
 function buildFanRow(cards, optsFn){
-  const row = el('div',{class:'hand-row-fan'});
-  const n = cards.length;
-  const cardWidth = 50;
-  const targetWidth = Math.min(window.innerWidth - 40, 640);
-  const MIN_W=32, VISIBLE_RATIO=0.46, GAP=6;
-  let width=cardWidth, marginLeft=GAP;
-  if(n>1){
-    const naturalTotal = n*cardWidth + (n-1)*GAP;
-    if(naturalTotal>targetWidth){
-      const maxOverlap = cardWidth - cardWidth*VISIBLE_RATIO;
-      const neededOverlap = (cardWidth*n - targetWidth)/(n-1);
-      if(neededOverlap<=maxOverlap){ width=cardWidth; marginLeft=-neededOverlap; }
-      else { width=Math.max(MIN_W, targetWidth/(1+(n-1)*VISIBLE_RATIO)); marginLeft=-(width-width*VISIBLE_RATIO); }
+  const n=cards.length;
+  const cw=currentCardWidth();
+  const avail=Math.min((typeof window!=='undefined'?window.innerWidth:400)-32, 980);
+  const minVisible=Math.round(cw*0.52); // 隣のカードに重なっても数字とマークが読める幅
+  // 1段で収まらない場合は2段・3段に分けて、重なりを最小限にする
+  let rows=1;
+  while(rows<4 && cw+(Math.ceil(n/rows)-1)*minVisible>avail) rows++;
+  const perRow=Math.ceil(n/rows);
+  const wrap=el('div',{class:'hand-rows'});
+  for(let r=0;r<rows;r++){
+    const slice=cards.slice(r*perRow,(r+1)*perRow);
+    if(slice.length===0) continue;
+    const row=el('div',{class:'hand-row-fan'});
+    const m=slice.length;
+    let overlap=0;
+    if(m>1){
+      overlap=Math.max(0,(cw*m-avail)/(m-1));
+      overlap=Math.min(overlap,cw-minVisible);
     }
+    slice.forEach((card,i)=>{
+      const c=cardEl(card, optsFn(card));
+      if(i>0) c.style.marginLeft=(-overlap)+'px';
+      c.style.zIndex=String(r*perRow+i);
+      row.appendChild(c);
+    });
+    wrap.appendChild(row);
   }
-  cards.forEach((card,i)=>{
-    const c = cardEl(card, optsFn(card));
-    c.style.width = width+'px'; c.style.height = Math.round(width*1.42)+'px';
-    if(i>0) c.style.marginLeft = marginLeft+'px';
-    c.style.zIndex = String(i);
-    row.appendChild(c);
-  });
-  return row;
+  return wrap;
 }
 function seededRand(seed){ const x=Math.sin(seed*12.9898)*43758.5453; return x-Math.floor(x); }
 function pileCluster(entry, idx, activeIdx){
   const seed=idx*17+3;
-  const baseX=(seededRand(seed)-0.5)*150;
-  const baseY=(seededRand(seed+1)-0.5)*70;
-  const baseRot=(seededRand(seed+2)-0.5)*22;
   const isActive=idx===activeIdx;
+  const side=(seededRand(seed)<0.5?-1:1);
+  const baseX= isActive ? 0 : side*(70+seededRand(seed+3)*40);
+  const baseY= isActive ? 8 : (seededRand(seed+1)-0.5)*50;
+  const baseRot= isActive ? 0 : (seededRand(seed+2)-0.5)*26;
   const wrap=el('div',{class:'pile-cluster'+(isActive?' active':'')});
   wrap.style.left=`calc(50% + ${baseX}px)`;
   wrap.style.top=`calc(50% + ${baseY}px)`;
@@ -394,7 +412,7 @@ function miniHandFan(count){
     b.style.left=(i*8)+'px'; b.style.zIndex=i;
     wrap.appendChild(b);
   }
-  wrap.appendChild(el('div',{class:'mini-count-badge',text:count+'枚'}));
+  wrap.appendChild(el('div',{class:'mini-count-badge'+(count<=2?' few':''),text:count+'枚'}));
   return wrap;
 }
 function rankLabels(n){
@@ -501,8 +519,6 @@ function renderGame(root){
 
   if(st.gamePhase === 'result'){ renderResult(root, st); return; }
 
-  root.appendChild(buildLangSwitch('game-lang-switch'));
-
   const topbar = el('div',{class:'topbar'});
   topbar.appendChild(el('div',{class:'title', text:t('roundTitle', st.roundNumber, st.roomCode)}));
   const badges = el('div',{class:'badge-row'});
@@ -510,6 +526,7 @@ function renderGame(root){
   if(st.tempReversed) badges.appendChild(el('div',{class:'badge on', text:t('tempReversedBadge')}));
   if(st.lockSeq) badges.appendChild(el('div',{class:'badge on', text:t('gekiBadge', st.lockSeq.suits.join(''), st.lockSeq.rank)}));
   else if(st.lockSuits) badges.appendChild(el('div',{class:'badge on', text:t('lockBadge', st.lockSuits.join(''))}));
+  badges.appendChild(buildLangSwitch());
   topbar.appendChild(badges);
   root.appendChild(topbar);
 
@@ -519,7 +536,9 @@ function renderGame(root){
     const pos = seatSlotForIndex(i,n);
     const cls = ['seat',pos]; if(p.finished) cls.push('done'); if(i===st.currentIndex && !p.finished) cls.push('current');
     const seat = el('div',{class:cls.join(' ')});
-    seat.appendChild(el('div',{class:'face', text:p.name.slice(0,1)}));
+    const faceEl=el('div',{class:'face',text:p.name.slice(0,1)});
+    faceEl.style.background=`linear-gradient(160deg,hsl(${[160,28,205,300,50][i%5]},45%,42%),hsl(${[160,28,205,300,50][i%5]},50%,26%))`;
+    seat.appendChild(faceEl);
     const nameRow = el('div',{class:'sname'});
     nameRow.appendChild(el('span',{text:p.name}));
     if(p.connected===false && !p.finished) nameRow.appendChild(el('span',{class:'disconnected-mark', text:' 💤', title:t('offline')}));
@@ -535,8 +554,9 @@ function renderGame(root){
   });
 
   const fieldZone = el('div',{class:'field-zone'});
-  if(st.lockSeq) fieldZone.appendChild(el('div',{class:'lock-banner', text:t('gekiBanner', st.lockSeq.suits.join(''), st.lockSeq.rank, st.lockSeq.count)}));
-  else if(st.lockSuits) fieldZone.appendChild(el('div',{class:'lock-banner', text:t('lockBanner', st.lockSuits.join('/'))}));
+  let lockStrip=null;
+  if(st.lockSeq) lockStrip=el('div',{class:'lock-banner lock-strip', text:t('gekiBanner', st.lockSeq.suits.join(''), st.lockSeq.rank, st.lockSeq.count)});
+  else if(st.lockSuits) lockStrip=el('div',{class:'lock-banner lock-strip', text:t('lockBanner', st.lockSuits.join('/'))});
 
   if(st.field===null){
     fieldZone.appendChild(el('div',{class:'field-empty', text:t('fieldEmpty')}));
@@ -558,9 +578,10 @@ function renderGame(root){
   }
   fieldZone.appendChild(el('div',{class:'log-line', text: st.log || ''}));
   arena.appendChild(fieldZone);
+  if(lockStrip) root.appendChild(lockStrip);
   root.appendChild(arena);
 
-  const panel = el('div',{class:'hand-panel'});
+  const panel = el('div',{class:'hand-panel'+((st.gamePhase!=='give'&&st.gamePhase!=='discard'&&st.currentIndex===myId)?' myturn':'')});
   const me = st.players[myId];
 
   if(st.gamePhase==='give' || st.gamePhase==='discard'){
@@ -811,6 +832,7 @@ function renderRulesModal(root){
 
 /* ---------- root render ---------- */
 function render(){
+  applyCardSize();
   const root = document.getElementById('app');
   root.innerHTML = '';
   if(app.screen==='landing') renderLanding(root);
