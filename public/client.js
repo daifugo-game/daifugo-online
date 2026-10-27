@@ -5,17 +5,14 @@ function isRed(suit){ return suit==='♥'||suit==='♦'; }
 const I18N = {
   ja: {
     brandKanji:'大富豪', brandEn:'ONLINE',
-    tabCreate:'ルームを作る', tabJoin:'ルームに参加',
-    namePlaceholder:'あなたの名前', codePlaceholder:'ルームコード(例: AB3XZ)',
-    joinBtn:'参加する', hostNote:'作成すると、あなたがホスト(進行役)になります。', createBtn:'ルームを作成',
-    overview:'【大富豪オンライン対戦】\n\n友達とリアルタイムで遊べる、大富豪のオンライン対戦ゲームです。\n\n順番にカードを出して、ほかのプレイヤーより早く手札をなくすことを目指します。\n\n通常の大富豪に加えて、革命・縛り・激縛り・8切り・7渡し・10捨て・Jバック・5飛び・6ロック・スペ3返し・JOKER選択などの特殊ルールがあります。\n\n詳しいルールは「詳しいルールを見る」から確認できます。',
+    namePlaceholder:'あなたの名前', findMatchBtn:'対戦相手を探す', matchNote:'オンラインで他のプレイヤーとマッチングします。4人そろうとすぐ開始、2人以上なら最大20秒待って開始します。', defaultName:'プレイヤー',
+    searching:'対戦相手を探しています…', matchCount:(n,m)=>`${n} / ${m} 人`, matchCountdown:s=>`あと${s}秒で、いまの人数で開始します`, matchWaitMore:'2人以上そろうとカウントダウンが始まります', cancelSearch:'やめる', youTag:'あなた', matchRulesNote:'標準ルール(すべてON)で対戦します',
+    overview:'【大富豪オンライン】\n\n世界中の人とマッチングして遊べる、大富豪(President)のオンライン対戦ゲームです。\n\n順番にカードを出して、ほかのプレイヤーより早く手札をなくすことを目指します。\n\n革命・縛り・8切り・7渡し・9リバース・10捨て・Jバック・5飛び・6ロック・スペ3返し・JOKERなど、頭を使う特殊ルールがあります。\n\n詳しいルールは「詳しいルールを見る」から確認できます。',
     viewRules:'詳しいルールを見る', closeRules:'閉じる',
-    enterRoomCode:'ルームコードを入力してください', defaultHostName:'ホスト',
-    lobbyTitle:'ロビー', copyLink:'リンクをコピー', host:'ホスト', online:'接続中', offline:'切断', leaveRoom:'ルームを退出', confirmLeave:'ルームを退出しますか?途中経過は失われます。',
-    needMorePlayers:'あと1人以上必要です', startGame:n=>`ゲームを始める(${n}人)`, waitingHost:'ホストが開始するのを待っています…',
+    lobbyTitle:'マッチング', online:'接続中', offline:'切断', leaveRoom:'退出する', confirmLeave:'退出しますか?途中経過は失われます。',
     loading:'読み込み中…',
-    roundTitle:(n,room)=>`大富豪 - ラウンド${n} (ルーム ${room})`,
-    revolutionBadge:(n,mult)=>`革命×${n}(pt${mult}倍)`, tempReversedBadge:'一時反転中',
+    roundTitle:(n)=>`大富豪 - ラウンド${n}`,
+    revolutionBadge:(n,mult)=>`革命×${n}(pt${mult}倍)`, tempReversedBadge:'一時反転中', reverseBadge:'逆回り',
     gekiBadge:(suits,rank)=>`激縛り:${suits}${rank}かJOKER`, lockBadge:suits=>`縛り:${suits}のみ`,
     fieldEmpty:'場は空です — 好きな組み合わせで出せます',
     gekiBanner:(suits,rank,count)=>`🔒 激縛り中:次は ${suits}${rank}${count>1?`(${count}枚組)`:''} か JOKER しか出せません`,
@@ -33,7 +30,7 @@ const I18N = {
     foulLine:(name,reason,amount,rate)=>`⚠️ ${name} が${reason}で反則(-${amount}pt, レート${rate}倍)`,
     rankLabels:{daifugo:'大富豪', fugo:'富豪', heimin:'平民', hinmin:'貧民', daihinmin:'大貧民'},
     totalPt:n=>`累計${n}pt`, nextRoundQ:'次のラウンドに進みますか?',
-    yesNextRound:'はい、次のラウンドへ', backToLobby:'ロビーに戻る', waitingNextRound:'ホストが次のラウンドを開始するのを待っています…',
+    yesNextRound:'次のラウンドへ', backToLobby:'退出する', waitingNextRound:'',
     errors:{
       not_your_turn:'あなたの番ではありません', invalid:'その組み合わせは出せません', forbidden_finish:'その組み合わせでは上がれません(禁止上がり)',
       cannot_pass:'パスできません', not_playable_now:'今は出せません', not_pending:'今は選べません', cannot_confirm:'選択枚数が違います',
@@ -50,6 +47,7 @@ const I18N = {
         {n:'革命 / Revolution', d:'同じ数字を4枚以上まとめて出すと、カードの強さの順序が逆転します。以降このラウンドが終わるまで効果が続き、再度発動するとさらに逆転します(階段には適用されません)。'},
         {n:'5飛び / Five Skip', d:'5を出すと、次のプレイヤーから「出した5の枚数×2−1」人分のターンを飛ばします。飛ばす人数が残りの他プレイヤー全員以上になる場合は、場がその場で流れて自分の番に戻ります。'},
         {n:'6ロック / Six Lock', d:'6を出すと、そのプレイで使ったスートに縛られます。場が流れるまで、そのスートのカードしか出せません(JOKERは常に例外)。'},
+        {n:'9リバース / Nine Reverse', d:'9を出すと、順番の回る向きが逆になります(同時に2枚出すと元の向きのまま)。次の人は逆回りで決まります。'},
         {n:'7渡し / Seven Give', d:'7を出すと、出した枚数分のカードを次のプレイヤーへすぐに渡す必要があります。渡すカードが足りない場合は反則上がりになります。'},
         {n:'8切り / Eight Cut', d:'8を出すと場がすぐに流れ、自分がそのまま続けて出せます(ただし8を含む上がりは常に反則上がりです)。'},
         {n:'10捨て / Ten Discard', d:'10を出すと、出した枚数分のカードをすぐに捨てる必要があります。捨てるカードが足りない場合は反則上がりになります。'},
@@ -73,17 +71,14 @@ const I18N = {
   },
   en: {
     brandKanji:'大富豪', brandEn:'ONLINE',
-    tabCreate:'Create Room', tabJoin:'Join Room',
-    namePlaceholder:'Your name', codePlaceholder:'Room code (e.g. AB3XZ)',
-    joinBtn:'Join', hostNote:'Creating a room makes you the host.', createBtn:'Create Room',
-    overview:'【Online Daifugo】\n\nA real-time online version of Daifugo (also known as President) that you can play with friends.\n\nTake turns playing cards and try to get rid of your entire hand before the other players.\n\nThis version includes special rules such as Revolution, Suit Lock, Strong Suit Lock, Eight Cut, Seven Give, Ten Discard, Jack Back, Five Skip, Six Lock, the 3 of Spades counter, and Joker selection.\n\nSee "View Detailed Rules" for the complete rules.',
+    namePlaceholder:'Your name', findMatchBtn:'Find a Match', matchNote:'Get matched with other players online. The game starts as soon as 4 players join — or after up to 20 seconds with 2 or more.', defaultName:'Player',
+    searching:'Looking for opponents…', matchCount:(n,m)=>`${n} / ${m} players`, matchCountdown:s=>`Starting with current players in ${s}s`, matchWaitMore:'The countdown starts once 2 or more players are here', cancelSearch:'Cancel', youTag:'You', matchRulesNote:'Played with the standard rules (all ON)',
+    overview:'【Online Daifugo】\n\nDaifugo ("The Great Millionaire", also known as President) is a Japanese card game where you race to empty your hand — and the order you finish decides who rules the table.\n\nGet matched with players online, take turns playing cards, and try to get rid of your hand first.\n\nSpecial rules like Revolution, Suit Lock, Eight Cut, Seven Pass, Nine Reverse, Ten Discard, Jack Back, Five Skip and Jokers make it a game of strategy.\n\nSee "View Detailed Rules" for the complete rules.',
     viewRules:'View Detailed Rules', closeRules:'Close',
-    enterRoomCode:'Please enter a room code', defaultHostName:'Host',
-    lobbyTitle:'Lobby', copyLink:'Copy Link', host:'Host', online:'Online', offline:'Offline', leaveRoom:'Leave Room', confirmLeave:'Leave this room? Your progress will be lost.',
-    needMorePlayers:'Need at least 1 more player', startGame:n=>`Start Game (${n} players)`, waitingHost:'Waiting for the host to start…',
+    lobbyTitle:'Matchmaking', online:'Online', offline:'Offline', leaveRoom:'Leave', confirmLeave:'Leave? Your progress will be lost.',
     loading:'Loading…',
-    roundTitle:(n,room)=>`Daifugo - Round ${n} (Room ${room})`,
-    revolutionBadge:(n,mult)=>`Revolution×${n} (${mult}× points)`, tempReversedBadge:'Temporarily Reversed',
+    roundTitle:(n)=>`Daifugo - Round ${n}`,
+    revolutionBadge:(n,mult)=>`Revolution×${n} (${mult}× points)`, tempReversedBadge:'Temporarily Reversed', reverseBadge:'Reverse order',
     gekiBadge:(suits,rank)=>`Strong Lock: ${suits}${rank} or JOKER`, lockBadge:suits=>`Suit Lock: ${suits} only`,
     fieldEmpty:'The table is empty — play any combination to lead',
     gekiBanner:(suits,rank,count)=>`🔒 Strong Suit Lock: only ${suits}${rank}${count>1?` (×${count})`:''} or JOKER can be played`,
@@ -101,11 +96,11 @@ const I18N = {
     foulLine:(name,reason,amount,rate)=>`⚠️ ${name} committed an illegal finish (${reason}) — -${amount}pt (rate ×${rate})`,
     rankLabels:{daifugo:'President', fugo:'Vice President', heimin:'Citizen', hinmin:'Poor', daihinmin:'Beggar'},
     totalPt:n=>`Total: ${n}pt`, nextRoundQ:'Proceed to the next round?',
-    yesNextRound:'Yes, Next Round', backToLobby:'Back to Lobby', waitingNextRound:'Waiting for the host to start the next round…',
+    yesNextRound:'Next Round', backToLobby:'Leave', waitingNextRound:'',
     errors:{
       not_your_turn:"It's not your turn", invalid:"That combination can't be played", forbidden_finish:"You can't finish with that combination (illegal finish)",
       cannot_pass:"You can't pass right now", not_playable_now:"You can't play right now", not_pending:'Nothing to choose right now', cannot_confirm:"That's not the right number of cards",
-      host_only:'Only the host can do that', already_started:'The game has already started', need_more_players:'Need at least 1 more player',
+      already_started:'The game has already started',
       no_room:'Room not found', bad_token:'Invalid connection info', not_started:"The game hasn't started yet",
     },
     rules:{
@@ -118,6 +113,7 @@ const I18N = {
         {n:'Revolution', d:'Playing 4 or more cards of the same rank at once reverses card strength for the rest of the round. Playing another Revolution flips it again. (Straights do not trigger this.)'},
         {n:'Five Skip', d:'Playing one or more 5s skips (2 × number of 5s played − 1) players starting from the next player. If that would skip every other remaining player, the table clears immediately and it becomes your turn again.'},
         {n:'Six Lock', d:'Playing a 6 locks the table to the suit(s) used in that play. Until the table clears, only that suit can be played (the Joker is always exempt).'},
+        {n:'Nine Reverse', d:'Playing a 9 reverses the direction of play (two 9s at once cancel out). The next player is then taken in the new direction.'},
         {n:'Seven Give', d:'Playing one or more 7s requires you to immediately give that many cards (your choice) to the next player. If you don\u2019t have enough cards left to give, it\u2019s an illegal finish.'},
         {n:'Eight Cut', d:'Playing an 8 clears the table immediately and you lead again right away. (Finishing your hand with an 8 is always an illegal finish.)'},
         {n:'Ten Discard', d:'Playing one or more 10s requires you to immediately discard that many cards from your hand. If you don\u2019t have enough cards left to discard, it\u2019s an illegal finish.'},
@@ -163,9 +159,7 @@ function tErr(code){
 /* ---------- tiny state ---------- */
 const app = {
   screen: 'landing',       // 'landing' | 'lobby' | 'game'
-  tab: 'create',           // 'create' | 'join'
   nameInput: '',
-  roomCodeInput: '',
   error: '',
   me: null,                // {roomCode, playerId, token}
   server: null,            // last polled personalized state
@@ -200,7 +194,6 @@ function clearSession(){
 }
 
 const params = new URLSearchParams(location.search);
-if(params.get('room')){ app.roomCodeInput = params.get('room').toUpperCase(); app.tab='join'; }
 
 /* ---------- API helpers ---------- */
 async function apiPost(path, body){
@@ -234,7 +227,7 @@ function describeError(code){
 async function poll(){
   if(!app.me) return;
   try{
-    const st = await apiGet(`/api/state?roomCode=${app.me.roomCode}&playerId=${app.me.playerId}&token=${app.me.token}`);
+    const st = await apiGet(`/api/state?roomCode=${app.me.roomCode}&token=${app.me.token}`);
     if(st.error){
       app.error = describeError(st.error);
       if(st.error==='no_room' || st.error==='bad_token'){
@@ -246,6 +239,7 @@ async function poll(){
     }
     else {
       app.server = st;
+      if(typeof st.youId==='number' && app.me.playerId!==st.youId){ app.me.playerId = st.youId; saveSession(); }
       app.screen = st.phase === 'lobby' ? 'lobby' : 'game';
       clearPendingJokerChoiceIfInvalid(st);
     }
@@ -258,28 +252,17 @@ function startPolling(){
   app.pollTimer = setInterval(poll, 1200);
 }
 
-/* ---------- actions: room creation / joining ---------- */
-async function createRoom(){
+/* ---------- actions: matchmaking ---------- */
+async function findMatch(){
   app.error='';
-  const res = await apiPost('/api/create', {name: app.nameInput.trim() || t('defaultHostName')});
-  if(res.error){ app.error = res.error; render(); return; }
-  app.me = {roomCode: res.roomCode, playerId: res.playerId, token: res.token};
-  saveSession();
-  history.replaceState(null,'', '?room='+res.roomCode);
-  startPolling();
-}
-async function joinRoom(){
-  app.error='';
-  const code = app.roomCodeInput.trim().toUpperCase();
-  if(!code){ app.error=t('enterRoomCode'); render(); return; }
-  const res = await apiPost('/api/join', {roomCode: code, name: app.nameInput.trim() || undefined});
+  const res = await apiPost('/api/match', {name: app.nameInput.trim() || t('defaultName')});
   if(res.error){ app.error = describeError(res.error) || res.error; render(); return; }
   app.me = {roomCode: res.roomCode, playerId: res.playerId, token: res.token};
   saveSession();
-  history.replaceState(null,'', '?room='+res.roomCode);
   startPolling();
 }
 function leaveRoom(){
+  if(app.me){ try{ apiPost('/api/leave', {roomCode:app.me.roomCode, token:app.me.token}); }catch(e){} }
   if(app.pollTimer) clearInterval(app.pollTimer);
   clearSession();
   app.me = null; app.server = null; app.screen = 'landing'; app.error='';
@@ -473,24 +456,11 @@ function renderLanding(root){
 
   card.appendChild(el('div',{class:'overview-text',text:t('overview')}));
 
-  const tabs = el('div',{class:'tab-row'});
-  tabs.appendChild(el('button',{class:'tab-btn'+(app.tab==='create'?' active':''), text:t('tabCreate'), onclick:()=>{app.tab='create'; render();}}));
-  tabs.appendChild(el('button',{class:'tab-btn'+(app.tab==='join'?' active':''), text:t('tabJoin'), onclick:()=>{app.tab='join'; render();}}));
-  card.appendChild(tabs);
-
-  const nameInput = el('input',{class:'field-input', type:'text', placeholder:t('namePlaceholder'), value:app.nameInput});
+  const nameInput = el('input',{class:'field-input', type:'text', placeholder:t('namePlaceholder'), maxlength:'20', value:app.nameInput});
   nameInput.addEventListener('input', e=>{ app.nameInput = e.target.value; });
   card.appendChild(nameInput);
-
-  if(app.tab==='join'){
-    const codeInput = el('input',{class:'field-input', type:'text', placeholder:t('codePlaceholder'), value:app.roomCodeInput});
-    codeInput.addEventListener('input', e=>{ app.roomCodeInput = e.target.value.toUpperCase(); });
-    card.appendChild(codeInput);
-    card.appendChild(el('button',{class:'start-btn', text:t('joinBtn'), onclick:joinRoom}));
-  } else {
-    card.appendChild(el('div',{class:'setup-label', text:t('hostNote')}));
-    card.appendChild(el('button',{class:'start-btn', text:t('createBtn'), onclick:createRoom}));
-  }
+  card.appendChild(el('div',{class:'setup-label', text:t('matchNote')}));
+  card.appendChild(el('button',{class:'start-btn', text:t('findMatchBtn'), onclick:findMatch}));
   if(app.error) card.appendChild(el('div',{class:'error-msg', text:app.error}));
   card.appendChild(el('button',{class:'rules-link-btn', text:t('viewRules'), onclick:()=>{ app.showRules=true; render(); }}));
   wrap.appendChild(card); root.appendChild(wrap);
@@ -507,6 +477,7 @@ const RULE_META = [
   {"id":"fiveSkip","kana":"ゴトビ","ja":"5飛び","en":"Five Skip","jaDesc":"5を出すと、次の人を飛ばす(枚数ぶん飛ぶ)。","enDesc":"Play a 5 and the next player is skipped (one extra skip per card).","group":"effect"},
   {"id":"sevenGive","kana":"ナナワタシ","ja":"7渡し","en":"Seven Pass","jaDesc":"7を出すと、手札から出した枚数ぶん、次の人へ渡す。","enDesc":"Play a 7 and hand that many cards from your hand to the next player.","group":"effect"},
   {"id":"eightCut","kana":"ヤギリ","ja":"8切り","en":"Eight Cut","jaDesc":"8を出すと場が流れて、自分がもう一度親になる。","enDesc":"Play an 8 and the pile is cleared; you lead again.","group":"effect"},
+  {"id":"nineReverse","kana":"ナインリバース","ja":"9リバース","en":"Nine Reverse","jaDesc":"9を出すと、順番の回る向きが逆になる(同時に2枚出すと元の向きのまま)。","enDesc":"Play a 9 and the turn order reverses direction (two 9s at once cancel out).","group":"effect"},
   {"id":"tenDiscard","kana":"ジュウステ","ja":"10捨て","en":"Ten Discard","jaDesc":"10を出すと、手札から出した枚数ぶん捨てられる。","enDesc":"Play a 10 and discard that many cards from your hand.","group":"effect"},
   {"id":"elevenBack","kana":"イレブンバック","ja":"Jバック","en":"Jack Back","jaDesc":"Jを出すと、その場が終わるまで強さが逆転する。","enDesc":"Play a Jack and the card order is reversed until the pile is cleared.","group":"effect"},
   {"id":"spade3","kana":"スペサンガエシ","ja":"スペ3返し","en":"Spade-3 Reversal","jaDesc":"JOKER単体には、♠3だけが勝てる。","enDesc":"A lone Joker can only be beaten by the 3 of Spades.","group":"effect"},
@@ -519,8 +490,8 @@ const RULE_GROUPS = {
   en: { core: 'Core', lock: 'Locks', effect: 'Card effects' }
 };
 const RULE_UI = {
-  ja: { title: 'ローカルルール', hint: 'カードの強さは変えず、遊び方だけを選べます。', std: '標準に戻す', off: 'すべてオフ', readonly: 'ホストが設定します', on: 'ON', offLabel: 'OFF' },
-  en: { title: 'House Rules', hint: 'Card strength never changes — pick how deep the strategy goes.', std: 'Reset to default', off: 'All off', readonly: 'Set by the host', on: 'ON', offLabel: 'OFF' }
+  ja: { title: 'ローカルルール', hint: 'カードの強さは変えず、遊び方だけを選べます。', std: '標準に戻す', off: 'すべてオフ', readonly: 'この対戦で使われるルール', on: 'ON', offLabel: 'OFF' },
+  en: { title: 'House Rules', hint: 'Card strength never changes — pick how deep the strategy goes.', std: 'Reset to default', off: 'All off', readonly: 'Rules used in this match', on: 'ON', offLabel: 'OFF' }
 };
 function ruleNames(r, lang) {
   return lang === 'en' ? { main: r.en, sub: r.kana + ' / ' + r.ja } : { main: r.kana, sub: r.ja + ' · ' + r.en };
@@ -584,46 +555,35 @@ const RULE_CSS = `
 /*RULE_PANEL_END*/
 
 /* ---------- render: lobby ---------- */
-(function(){ try{ const st=document.createElement('style'); st.textContent=RULE_CSS; document.head.appendChild(st);}catch(e){} })();
+(function(){ try{ const st=document.createElement('style'); st.textContent=RULE_CSS+'.match-status{text-align:center;margin:14px 0;} .match-title{font-weight:700;color:var(--gold-soft);} .match-count{font-size:1.6rem;font-weight:800;margin:6px 0;} .match-sub{font-size:.75rem;color:var(--muted);}'; document.head.appendChild(st);}catch(e){} })();
 function renderLobby(root){
   const wrap = el('div',{class:'landing-wrap'});
   const card = el('div',{class:'landing-card'});
   card.appendChild(el('div',{class:'brand'},[el('div',{class:'kanji',text:t('brandKanji')}),el('span',{class:'en',text:t('lobbyTitle')})]));
 
-  const box = el('div',{class:'room-code-box'});
-  box.appendChild(el('div',{class:'code', text: app.me.roomCode}));
-  const link = location.origin + location.pathname + '?room=' + app.me.roomCode;
-  box.appendChild(el('div',{class:'link', text: link}));
-  box.appendChild(el('button',{class:'copy-btn', text:t('copyLink'), onclick: async ()=>{
-    try{ await navigator.clipboard.writeText(link); }catch(e){}
-  }}));
-  card.appendChild(box);
+  const sv = app.server;
+  const cnt = sv ? sv.lobbyPlayers.length : 1;
+  card.appendChild(el('div',{class:'match-status'},[
+    el('div',{class:'match-title', text:t('searching')}),
+    el('div',{class:'match-count', text:t('matchCount', cnt, sv ? sv.matchSize : 4)}),
+    el('div',{class:'match-sub', text: (sv && sv.matchSecondsLeft!==null) ? t('matchCountdown', sv.matchSecondsLeft) : t('matchWaitMore')}),
+  ]));
 
   const list = el('div',{class:'lobby-list'});
   (app.server ? app.server.lobbyPlayers : []).forEach((p,i)=>{
     const row = el('div',{class:'lobby-row'});
     row.appendChild(el('div',{class:'lname', text:p.name}));
-    if(i===0) row.appendChild(el('div',{class:'lhost', text:t('host')}));
+    if(app.server && p.id===app.server.youId) row.appendChild(el('div',{class:'lhost', text:t('youTag')}));
     row.appendChild(el('div',{class:'conn-badge '+(p.connected?'online':'offline'), text:p.connected?t('online'):t('offline')}));
     list.appendChild(row);
   });
   card.appendChild(list);
 
-  if(app.server && app.server.rules){
-    card.appendChild(buildRulePanel({rules:app.server.rules, editable:!!app.server.isHost, lang:app.lang,
-      onChange: (patch)=>sendAction({type:'setRules', rules:patch})}));
-  }
+  if(app.server && app.server.rules) card.appendChild(buildRulePanel({rules:app.server.rules, editable:false, lang:app.lang, onChange:()=>{}}));
 
-  const n = app.server ? app.server.lobbyPlayers.length : 1;
-  if(app.server && app.server.isHost){
-    card.appendChild(el('button',{class:'start-btn', text: n<2 ? t('needMorePlayers') : t('startGame', n),
-      disabled: n<2?'disabled':null, onclick: ()=>sendAction({type:'start'})}));
-  } else {
-    card.appendChild(el('div',{class:'waiting-msg', text:t('waitingHost')}));
-  }
   if(app.error) card.appendChild(el('div',{class:'error-msg', text:app.error}));
   card.appendChild(el('button',{class:'rules-link-btn', text:t('viewRules'), onclick:()=>{ app.showRules=true; render(); }}));
-  card.appendChild(el('button',{class:'rules-link-btn', text:t('leaveRoom'), onclick:()=>{ if(confirm(t('confirmLeave'))) leaveRoom(); }}));
+  card.appendChild(el('button',{class:'rules-link-btn', text:t('cancelSearch'), onclick:()=>leaveRoom()}));
   wrap.appendChild(card); root.appendChild(wrap);
 }
 
@@ -637,9 +597,10 @@ function renderGame(root){
   if(st.gamePhase === 'result'){ renderResult(root, st); return; }
 
   const topbar = el('div',{class:'topbar'});
-  topbar.appendChild(el('div',{class:'title', text:t('roundTitle', st.roundNumber, st.roomCode)}));
+  topbar.appendChild(el('div',{class:'title', text:t('roundTitle', st.roundNumber)}));
   const badges = el('div',{class:'badge-row'});
   if(st.revolutionCount>0) badges.appendChild(el('div',{class:'badge gold', text:t('revolutionBadge', st.revolutionCount, Math.pow(2,st.revolutionCount))}));
+  if(st.direction===-1) badges.appendChild(el('div',{class:'badge on', text:'↺ '+t('reverseBadge')}));
   if(st.tempReversed) badges.appendChild(el('div',{class:'badge on', text:t('tempReversedBadge')}));
   if(st.lockSeq) badges.appendChild(el('div',{class:'badge on', text:t('gekiBadge', st.lockSeq.suits.join(''), st.lockSeq.rank)}));
   else if(st.lockSuits) badges.appendChild(el('div',{class:'badge on', text:t('lockBadge', st.lockSuits.join(''))}));
@@ -866,15 +827,11 @@ function renderResult(root, st){
     list.appendChild(row);
   });
   card.appendChild(list);
-  if(app.server.isHost){
-    card.appendChild(el('div',{class:'result-sub', text:t('nextRoundQ'), style:'margin-top:18px;margin-bottom:0;'}));
-    const btns = el('div',{class:'result-btns'});
-    btns.appendChild(el('button',{class:'btn play', text:t('yesNextRound'), onclick:()=>sendAction({type:'nextRound'})}));
-    btns.appendChild(el('button',{class:'btn pass', text:t('backToLobby'), onclick:()=>sendAction({type:'backToLobby'})}));
-    card.appendChild(btns);
-  } else {
-    card.appendChild(el('div',{class:'waiting-msg', text:t('waitingNextRound')}));
-  }
+  card.appendChild(el('div',{class:'result-sub', text:t('nextRoundQ'), style:'margin-top:18px;margin-bottom:0;'}));
+  const btns = el('div',{class:'result-btns'});
+  btns.appendChild(el('button',{class:'btn play', text:t('yesNextRound'), onclick:()=>sendAction({type:'nextRound'})}));
+  btns.appendChild(el('button',{class:'btn pass', text:t('backToLobby'), onclick:()=>leaveRoom()}));
+  card.appendChild(btns);
   wrap.appendChild(card); root.appendChild(wrap);
   if(st.finishOrder[0]===app.me.playerId && app.__confettiRound!==st.roundNumber && !(st.pendingFoulPenalties&&st.pendingFoulPenalties.some(f=>f.playerId===app.me.playerId))){ app.__confettiRound=st.roundNumber; launchConfetti(); }
 }

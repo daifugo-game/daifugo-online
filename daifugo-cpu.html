@@ -339,7 +339,7 @@ document.addEventListener('dblclick',function(e){e.preventDefault();});
 <script>
 const SUITS=['♠','♥','♦','♣'];
 const RANKS=['3','4','5','6','7','8','9','10','J','Q','K','A','2'];
-const EFFECT_RANKS=['5','6','7','8','10','J'];
+const EFFECT_RANKS=['5','6','7','8','9','10','J'];
 
 /*RULE_META_START*/
 const RULE_META = [
@@ -352,6 +352,7 @@ const RULE_META = [
   {"id":"fiveSkip","kana":"ゴトビ","ja":"5飛び","en":"Five Skip","jaDesc":"5を出すと、次の人を飛ばす(枚数ぶん飛ぶ)。","enDesc":"Play a 5 and the next player is skipped (one extra skip per card).","group":"effect"},
   {"id":"sevenGive","kana":"ナナワタシ","ja":"7渡し","en":"Seven Pass","jaDesc":"7を出すと、手札から出した枚数ぶん、次の人へ渡す。","enDesc":"Play a 7 and hand that many cards from your hand to the next player.","group":"effect"},
   {"id":"eightCut","kana":"ヤギリ","ja":"8切り","en":"Eight Cut","jaDesc":"8を出すと場が流れて、自分がもう一度親になる。","enDesc":"Play an 8 and the pile is cleared; you lead again.","group":"effect"},
+  {"id":"nineReverse","kana":"ナインリバース","ja":"9リバース","en":"Nine Reverse","jaDesc":"9を出すと、順番の回る向きが逆になる(同時に2枚出すと元の向きのまま)。","enDesc":"Play a 9 and the turn order reverses direction (two 9s at once cancel out).","group":"effect"},
   {"id":"tenDiscard","kana":"ジュウステ","ja":"10捨て","en":"Ten Discard","jaDesc":"10を出すと、手札から出した枚数ぶん捨てられる。","enDesc":"Play a 10 and discard that many cards from your hand.","group":"effect"},
   {"id":"elevenBack","kana":"イレブンバック","ja":"Jバック","en":"Jack Back","jaDesc":"Jを出すと、その場が終わるまで強さが逆転する。","enDesc":"Play a Jack and the card order is reversed until the pile is cleared.","group":"effect"},
   {"id":"spade3","kana":"スペサンガエシ","ja":"スペ3返し","en":"Spade-3 Reversal","jaDesc":"JOKER単体には、♠3だけが勝てる。","enDesc":"A lone Joker can only be beaten by the 3 of Spades.","group":"effect"},
@@ -364,8 +365,8 @@ const RULE_GROUPS = {
   en: { core: 'Core', lock: 'Locks', effect: 'Card effects' }
 };
 const RULE_UI = {
-  ja: { title: 'ローカルルール', hint: 'カードの強さは変えず、遊び方だけを選べます。', std: '標準に戻す', off: 'すべてオフ', readonly: 'ホストが設定します', on: 'ON', offLabel: 'OFF' },
-  en: { title: 'House Rules', hint: 'Card strength never changes — pick how deep the strategy goes.', std: 'Reset to default', off: 'All off', readonly: 'Set by the host', on: 'ON', offLabel: 'OFF' }
+  ja: { title: 'ローカルルール', hint: 'カードの強さは変えず、遊び方だけを選べます。', std: '標準に戻す', off: 'すべてオフ', readonly: 'この対戦で使われるルール', on: 'ON', offLabel: 'OFF' },
+  en: { title: 'House Rules', hint: 'Card strength never changes — pick how deep the strategy goes.', std: 'Reset to default', off: 'All off', readonly: 'Rules used in this match', on: 'ON', offLabel: 'OFF' }
 };
 function ruleNames(r, lang) {
   return lang === 'en' ? { main: r.en, sub: r.kana + ' / ' + r.ja } : { main: r.kana, sub: r.ja + ' · ' + r.en };
@@ -513,7 +514,7 @@ const I18N={
     strategyEarly:'まだ序盤です。まずは階段やペアなど、まとまった手から効率よく減らしましょう。',
     recommendedMove:desc=>`おすすめの一手: ${desc}`,
     roundTitle:n=>`大富豪 - ラウンド${n}`, rulesBtnShort:'ルール',
-    revolutionBadge:(n,mult)=>`革命×${n}(pt${mult}倍)`, tempReversedBadge:'一時反転中', reversedBadge:'強さ逆転中',
+    revolutionBadge:(n,mult)=>`革命×${n}(pt${mult}倍)`, tempReversedBadge:'一時反転中', reverseBadge:'逆回り', reversedBadge:'強さ逆転中',
     gekiBadge:(suits,rank)=>`激縛り:${suits}${rank}かJOKER`, lockBadge:suits=>`縛り:${suits}のみ`,
     finishedLabel:'完了',
     gekiBanner:(suits,rank,shape)=>`🔒 激縛り中:次は ${suits}${rank}${shape} か JOKER しか出せません`,
@@ -610,7 +611,7 @@ const I18N={
     strategyEarly:"It's still early. Start by clearing out efficient combos like straights and pairs.",
     recommendedMove:desc=>`Recommended move: ${desc}`,
     roundTitle:n=>`Daifugo - Round ${n}`, rulesBtnShort:'Rules',
-    revolutionBadge:(n,mult)=>`Revolution×${n} (${mult}× points)`, tempReversedBadge:'Temporarily Reversed', reversedBadge:'Strength Reversed',
+    revolutionBadge:(n,mult)=>`Revolution×${n} (${mult}× points)`, tempReversedBadge:'Temporarily Reversed', reverseBadge:'Reverse order', reversedBadge:'Strength Reversed',
     gekiBadge:(suits,rank)=>`Strong Lock: ${suits}${rank} or JOKER`, lockBadge:suits=>`Suit Lock: ${suits} only`,
     finishedLabel:'Done',
     gekiBanner:(suits,rank,shape)=>`🔒 Strong Suit Lock: only ${suits}${rank}${shape} or JOKER can be played`,
@@ -698,7 +699,7 @@ const state={
   field:null, fieldOwner:null,
   lockSuits:null, lockSeq:null, prevTrack:null,
   passedThisField:new Set(),
-  revolutionCount:0, tempReversed:false,
+  revolutionCount:0, tempReversed:false, direction:1,
   finishOrder:[], selected:new Set(), log:'',
   pendingAction:null, pendingCount:0, pendingActor:null, effectQueue:[], pendingAfterQueue:null,
   showRules:false, roundNumber:1, lastRoundPoints:0,
@@ -734,7 +735,7 @@ function nextStrongerRank(rank){
 }
 function activePlayers(){return state.players.filter(p=>!p.finished);}
 function isSelfMode(){ return state.mode==='cpu' || state.mode==='practice'; }
-function nextActiveRaw(i){const n=state.players.length;let j=i;do{j=(j+1)%n;}while(state.players[j].finished);return j;}
+function nextActiveRaw(i){const n=state.players.length;let j=i;const d=state.direction===-1?n-1:1;do{j=(j+d)%n;}while(state.players[j].finished);return j;}
 
 function startGame(){
   const n=state.playerCount;
@@ -767,7 +768,7 @@ function dealRound(){
   state.currentIndex=starter;
   state.field=null; state.fieldOwner=null;
   state.lockSuits=null; state.lockSeq=null; state.prevTrack=null;   state.passedThisField=new Set();
-  state.revolutionCount=0; state.tempReversed=false;
+  state.revolutionCount=0; state.tempReversed=false; state.direction=1;
   state.finishOrder=[]; state.selected=new Set();
   state.trickHistory=[];
   state.log=`ダイヤの3を持つ ${state.players[starter].name} から開始`;
@@ -1115,10 +1116,11 @@ function applyPlay(playerIndex,cardIds,jokerAssignment){
 
   let cutFlag=false, tobiSteps=0;
   const queue=[];
-  ['6','J','7','10','5','8'].forEach(r=>{
+  ['9','6','J','7','10','5','8'].forEach(r=>{
     const e=effects.find(x=>x.rank===r);
     if(!e) return;
-    if(!ruleOn({'6':'rokuLock','J':'elevenBack','7':'sevenGive','10':'tenDiscard','5':'fiveSkip','8':'eightCut'}[r])) return;
+    if(!ruleOn({'9':'nineReverse','6':'rokuLock','J':'elevenBack','7':'sevenGive','10':'tenDiscard','5':'fiveSkip','8':'eightCut'}[r])) return;
+    if(r==='9' && e.count%2===1){ state.direction=state.direction===-1?1:-1; logMsg+='(9リバース!順番が逆回り)'; }
     if(r==='6'){ state.lockSuits=v.suitsUsed.slice(); state.lockSeq=null; logMsg+=`(6ロック発動!次は${state.lockSuits.join('/')}のみ)`; }
     if(r==='J'){ state.tempReversed=!state.tempReversed; logMsg+='(強さ反転)'; }
     if(r==='7'){ queue.push({type:'give',n:e.count}); }
@@ -2101,6 +2103,7 @@ function renderTable(root){
   const badges=el('div',{class:'badge-row'});
   badges.appendChild(el('button',{class:'top-rules-btn',text:t('rulesBtnShort'),onclick:()=>{state.showRules=true;render();}}));
   if(state.revolutionCount>0) badges.appendChild(el('div',{class:'badge gold',text:t('revolutionBadge',state.revolutionCount,Math.pow(2,state.revolutionCount))}));
+  if(state.direction===-1) badges.appendChild(el('div',{class:'badge on',text:'↺ '+t('reverseBadge')}));
   if(state.tempReversed) badges.appendChild(el('div',{class:'badge on',text:t('tempReversedBadge')}));
   if(effectiveReversed()) badges.appendChild(el('div',{class:'badge on',text:t('reversedBadge')}));
   if(state.lockSeq) badges.appendChild(el('div',{class:'badge on',text:t('gekiBadge',state.lockSeq.suits.join(''),state.lockSeq.rank)}));

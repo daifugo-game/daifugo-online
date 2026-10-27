@@ -9,7 +9,6 @@ const engine = require('./engine');
 
 const PORT = process.env.PORT || 3000;
 const ROOM_TTL_MS = 6 * 60 * 60 * 1000; // 6時間操作がなければルームを自動破棄
-const MAX_PLAYERS = 5;
 
 /** @type {Object<string, Room>} */
 const rooms = {};
@@ -24,36 +23,72 @@ function makeRoomCode() {
 }
 function makeToken() { return crypto.randomBytes(16).toString('hex'); }
 
-function createRoom(hostName) {
+/* ============================================================
+   オンラインマッチング(ルームコードなし)
+   - 4人そろったら即開始 / 2人以上で一定時間待ったらその人数で開始
+   - ロビーで放置(pollが止まった)プレイヤーは自動で外れる
+   ============================================================ */
+const MATCH_SIZE = 4;
+const MATCH_WAIT_MS = 20000;   // 2人以上そろってからの最大待ち時間
+const LOBBY_STALE_MS = 8000;   // この時間pollが無ければロビーから外す
+
+function createRoom() {
   const code = makeRoomCode();
   const room = {
     code,
     createdAt: Date.now(),
     lastActivity: Date.now(),
     phase: 'lobby', // 'lobby' | 'playing'
-    players: [{ id: 0, token: makeToken(), name: hostName || 'ホスト', connected: true, lastPoll: Date.now() }],
+    players: [],
+    readyAt: null,  // 2人以上になった時刻
     gs: null,
-    rules: engine.normalizeRules(null),
+    rules: engine.normalizeRules(null), // マッチングでは標準ルール(全ON)固定
   };
   rooms[code] = room;
   return room;
 }
-function joinRoom(code, name) {
-  const room = rooms[code];
-  if (!room) return { error: 'ルームが見つかりません' };
-  if (room.phase !== 'lobby') return { error: 'すでにゲームが始まっています' };
-  if (room.players.length >= MAX_PLAYERS) return { error: 'ルームが満員です(最大5人)' };
+function renumber(room) { room.players.forEach((p, i) => { p.id = i; }); }
+function findOpenRoom() {
+  tickAllLobbies();
+  return Object.values(rooms).find(r => r.phase === 'lobby' && r.players.length < MATCH_SIZE) || null;
+}
+function enqueue(name) {
+  const room = findOpenRoom() || createRoom();
   const id = room.players.length;
   const token = makeToken();
-  room.players.push({ id, token, name: name || `プレイヤー${id + 1}`, connected: true, lastPoll: Date.now() });
+  let base = name || `Player`, uniq = base, k = 2;
+  while (room.players.some(p => p.name === uniq)) uniq = `${base} ${k++}`;
+  name = uniq;
+  room.players.push({ id, token, name, connected: true, lastPoll: Date.now() });
   room.lastActivity = Date.now();
+  tickLobby(room);
   return { room, id, token };
 }
-function findPlayer(room, id, token) {
-  const p = room.players[id];
-  if (!p || p.token !== token) return null;
-  return p;
+function findPlayer(room, token) {
+  return room.players.find(p => p.token === token) || null;
 }
+function removePlayer(room, player) {
+  room.players = room.players.filter(p => p !== player);
+  renumber(room);
+  if (room.players.length === 0 && room.phase === 'lobby') delete rooms[room.code];
+}
+function tickLobby(room) {
+  if (room.phase !== 'lobby') return;
+  const now = Date.now();
+  room.players.filter(p => now - p.lastPoll > LOBBY_STALE_MS).forEach(p => removePlayer(room, p));
+  if (!rooms[room.code]) return;
+  if (room.players.length >= 2) { if (!room.readyAt) room.readyAt = now; } else room.readyAt = null;
+  const full = room.players.length >= MATCH_SIZE;
+  const waited = room.readyAt && now - room.readyAt >= MATCH_WAIT_MS;
+  if (full || waited) {
+    room.phase = 'playing';
+    room.gs = engine.createGameState(room.players.map(p => ({ name: p.name })), room.rules);
+  }
+}
+function tickAllLobbies() {
+  Object.values(rooms).forEach(r => { if (r.phase === 'lobby') tickLobby(r); });
+}
+setInterval(tickAllLobbies, 3000);
 
 /* ============================================================
    接続状態の管理・AFK(放置)自動進行
@@ -119,8 +154,9 @@ function serializeForPlayer(room, viewerId) {
     phase: room.phase,
     lobbyPlayers: room.players.map(p => ({ id: p.id, name: p.name, connected: p.connected })),
     youId: viewerId,
-    isHost: viewerId === 0,
     rules: room.rules,
+    matchSize: MATCH_SIZE,
+    matchSecondsLeft: (room.phase === 'lobby' && room.readyAt) ? Math.max(0, Math.ceil((MATCH_WAIT_MS - (Date.now() - room.readyAt)) / 1000)) : null,
   };
   if (room.phase === 'lobby' || !room.gs) return base;
   const gs = room.gs;
@@ -131,6 +167,7 @@ function serializeForPlayer(room, viewerId) {
   base.lockSeq = gs.lockSeq;
   base.revolutionCount = gs.revolutionCount;
   base.tempReversed = gs.tempReversed;
+  base.direction = gs.direction;
   base.log = gs.log;
   base.trickHistory = gs.trickHistory;
   base.finishOrder = gs.finishOrder;
@@ -198,43 +235,48 @@ const server = http.createServer(async (req, res) => {
   }
 
   // ---- API ----
-  if (url.pathname === '/api/create' && req.method === 'POST') {
+  if (url.pathname === '/api/match' && req.method === 'POST') {
     try {
       const { name } = await readBody(req);
-      const room = createRoom(name);
-      return sendJson(res, 200, { roomCode: room.code, playerId: 0, token: room.players[0].token });
+      const result = enqueue(String(name || '').trim().slice(0, 20));
+      return sendJson(res, 200, { roomCode: result.room.code, playerId: result.id, token: result.token });
     } catch (e) { return sendJson(res, 400, { error: 'bad_request' }); }
   }
 
-  if (url.pathname === '/api/join' && req.method === 'POST') {
+  if (url.pathname === '/api/leave' && req.method === 'POST') {
     try {
-      const { roomCode, name } = await readBody(req);
-      const result = joinRoom((roomCode || '').toUpperCase().trim(), (name || '').trim());
-      if (result.error) return sendJson(res, 400, { error: result.error });
-      return sendJson(res, 200, { roomCode: result.room.code, playerId: result.id, token: result.token });
+      const { roomCode, token } = await readBody(req);
+      const room = rooms[(roomCode || '').toUpperCase()];
+      const player = room && findPlayer(room, token);
+      if (room && player) {
+        if (room.phase === 'lobby') removePlayer(room, player);
+        else player.lastPoll = 0; // ゲーム中の退出は放置扱い(AFK自動進行に任せる)
+      }
+      return sendJson(res, 200, { ok: true });
     } catch (e) { return sendJson(res, 400, { error: 'bad_request' }); }
   }
 
   if (url.pathname === '/api/state' && req.method === 'GET') {
     const roomCode = (url.searchParams.get('roomCode') || '').toUpperCase();
-    const playerId = Number(url.searchParams.get('playerId'));
     const token = url.searchParams.get('token');
     const room = rooms[roomCode];
     if (!room) return sendJson(res, 404, { error: 'no_room' });
-    const player = findPlayer(room, playerId, token);
+    const player = findPlayer(room, token);
     if (!player) return sendJson(res, 403, { error: 'bad_token' });
     player.connected = true; player.lastPoll = Date.now();
+    tickLobby(room);
     autoAdvanceIfAfk(room);
-    return sendJson(res, 200, serializeForPlayer(room, playerId));
+    return sendJson(res, 200, serializeForPlayer(room, player.id));
   }
 
   if (url.pathname === '/api/jokerChoices' && req.method === 'POST') {
     try {
-      const { roomCode, playerId, token, cardIds } = await readBody(req);
+      const { roomCode, token, cardIds } = await readBody(req);
       const room = rooms[(roomCode || '').toUpperCase()];
       if (!room) return sendJson(res, 404, { error: 'no_room' });
-      const player = findPlayer(room, playerId, token);
+      const player = findPlayer(room, token);
       if (!player) return sendJson(res, 403, { error: 'bad_token' });
+      const playerId = player.id;
       if (!room.gs) return sendJson(res, 400, { error: 'not_started' });
       if (room.gs.currentIndex !== playerId) return sendJson(res, 400, { error: 'not_your_turn' });
       const ids = Array.isArray(cardIds) ? cardIds.filter(x => typeof x === 'string') : [];
@@ -250,11 +292,12 @@ const server = http.createServer(async (req, res) => {
   if (url.pathname === '/api/action' && req.method === 'POST') {
     try {
       const body = await readBody(req);
-      const { roomCode, playerId, token, action } = body;
+      const { roomCode, token, action } = body;
       const room = rooms[(roomCode || '').toUpperCase()];
       if (!room) return sendJson(res, 404, { error: 'no_room' });
-      const player = findPlayer(room, playerId, token);
+      const player = findPlayer(room, token);
       if (!player) return sendJson(res, 403, { error: 'bad_token' });
+      const playerId = player.id;
       touchRoom(room);
       player.connected = true; player.lastPoll = Date.now();
       autoAdvanceIfAfk(room); // 自分より前に他の誰かがAFKで止まっていないか、先に進めておく
@@ -281,20 +324,6 @@ const server = http.createServer(async (req, res) => {
 });
 
 function handleAction(room, playerId, action) {
-  if (action.type === 'setRules') {
-    if (playerId !== 0) return { error: 'host_only' };
-    if (room.phase !== 'lobby') return { error: 'already_started' };
-    room.rules = engine.normalizeRules(Object.assign({}, room.rules, action.rules || {}));
-    return { ok: true };
-  }
-  if (action.type === 'start') {
-    if (playerId !== 0) return { error: 'host_only' };
-    if (room.phase !== 'lobby') return { error: 'already_started' };
-    if (room.players.length < 2) return { error: 'need_more_players' };
-    room.phase = 'playing';
-    room.gs = engine.createGameState(room.players.map(p => ({ name: p.name })), room.rules);
-    return { ok: true };
-  }
   if (!room.gs) return { error: 'not_started' };
   const gs = room.gs;
 
@@ -328,16 +357,9 @@ function handleAction(room, playerId, action) {
     return ok ? { ok: true } : { error: 'cannot_confirm' };
   }
   if (action.type === 'nextRound') {
-    if (playerId !== 0) return { error: 'host_only' };
     if (gs.phase !== 'result') return { error: 'not_result' };
     gs.roundNumber++;
     engine.dealRound(gs);
-    return { ok: true };
-  }
-  if (action.type === 'backToLobby') {
-    if (playerId !== 0) return { error: 'host_only' };
-    room.phase = 'lobby';
-    room.gs = null;
     return { ok: true };
   }
   return { error: 'unknown_action' };

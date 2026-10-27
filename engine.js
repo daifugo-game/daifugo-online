@@ -7,7 +7,7 @@
    ============================================================ */
 const SUITS = ['♠', '♥', '♦', '♣'];
 const RANKS = ['3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A', '2'];
-const EFFECT_RANKS = ['5', '6', '7', '10', 'J']; // 8は別扱い(cutFlag)
+const EFFECT_RANKS = ['5', '6', '7', '9', '10', 'J']; // 8は別扱い(cutFlag)
 
 /* ============================================================
    ローカルルール定義(オン/オフ可能)。カードの基本の強さは変更しない。
@@ -22,6 +22,7 @@ const RULE_DEFS = [
   { id: 'fiveSkip',    kana: 'ゴトビ',         ja: '5飛び',        en: 'Five Skip',      jaDesc: '5を出すと、次の人を飛ばす(枚数ぶん飛ぶ)。', enDesc: 'Play a 5 and the next player is skipped (one extra skip per card).', group: 'effect' },
   { id: 'sevenGive',   kana: 'ナナワタシ',     ja: '7渡し',        en: 'Seven Pass',     jaDesc: '7を出すと、手札から出した枚数ぶん、次の人へ渡す。', enDesc: 'Play a 7 and hand that many cards from your hand to the next player.', group: 'effect' },
   { id: 'eightCut',    kana: 'ヤギリ',         ja: '8切り',        en: 'Eight Cut',      jaDesc: '8を出すと場が流れて、自分がもう一度親になる。', enDesc: 'Play an 8 and the pile is cleared; you lead again.', group: 'effect' },
+  { id: 'nineReverse', kana: 'ナインリバース', ja: '9リバース', en: 'Nine Reverse', jaDesc: '9を出すと、順番の回る向きが逆になる(同時に2枚出すと元の向きのまま)。', enDesc: 'Play a 9 and the turn order reverses direction (two 9s at once cancel out).', group: 'effect' },
   { id: 'tenDiscard',  kana: 'ジュウステ',     ja: '10捨て',       en: 'Ten Discard',    jaDesc: '10を出すと、手札から出した枚数ぶん捨てられる。', enDesc: 'Play a 10 and discard that many cards from your hand.', group: 'effect' },
   { id: 'elevenBack',  kana: 'イレブンバック', ja: 'Jバック',      en: 'Jack Back',      jaDesc: 'Jを出すと、その場が終わるまで強さが逆転する。', enDesc: 'Play a Jack and the card order is reversed until the pile is cleared.', group: 'effect' },
   { id: 'spade3',      kana: 'スペサンガエシ', ja: 'スペ3返し',    en: 'Spade-3 Reversal', jaDesc: 'JOKER単体には、♠3だけが勝てる。', enDesc: 'A lone Joker can only be beaten by the 3 of Spades.', group: 'effect' },
@@ -81,8 +82,8 @@ function nextStrongerRank(gs, rank) {
 }
 function activePlayers(gs) { return gs.players.filter(p => !p.finished); }
 function nextActiveRaw(gs, i) {
-  const n = gs.players.length; let j = i;
-  do { j = (j + 1) % n; } while (gs.players[j].finished);
+  const n = gs.players.length; let j = i; const d = gs.direction === -1 ? n - 1 : 1;
+  do { j = (j + d) % n; } while (gs.players[j].finished);
   return j;
 }
 
@@ -412,11 +413,12 @@ function applyPlay(gs, playerIndex, cardIds, jokerAssignment) {
 
   let cutFlag = false, tobiSteps = 0;
   const queue = [];
-  ['6', 'J', '7', '10', '5', '8'].forEach(r => {
+  ['9', '6', 'J', '7', '10', '5', '8'].forEach(r => {
     const e = effects.find(x => x.rank === r);
     if (!e) return;
-    const ruleId = { '6': 'rokuLock', 'J': 'elevenBack', '7': 'sevenGive', '10': 'tenDiscard', '5': 'fiveSkip', '8': 'eightCut' }[r];
+    const ruleId = { '9': 'nineReverse', '6': 'rokuLock', 'J': 'elevenBack', '7': 'sevenGive', '10': 'tenDiscard', '5': 'fiveSkip', '8': 'eightCut' }[r];
     if (!ruleOn(gs, ruleId)) return;
+    if (r === '9' && e.count % 2 === 1) { gs.direction = gs.direction === -1 ? 1 : -1; logMsg += '(9リバース!順番が逆回り)'; }
     if (r === '6') { gs.lockSuits = v.suitsUsed.slice(); gs.lockSeq = null; logMsg += `(6ロック発動!次は${gs.lockSuits.join('/')}のみ)`; }
     if (r === 'J') { gs.tempReversed = !gs.tempReversed; logMsg += '(強さ反転)'; }
     if (r === '7') { queue.push({ type: 'give', n: e.count }); }
@@ -688,7 +690,7 @@ function dealRound(gs) {
   gs.field = null; gs.fieldOwner = null;
   gs.lockSuits = null; gs.lockSeq = null; gs.prevTrack = null;
   gs.passedThisField = new Set();
-  gs.revolutionCount = 0; gs.tempReversed = false;
+  gs.revolutionCount = 0; gs.tempReversed = false; gs.direction = 1;
   gs.finishOrder = []; gs.selected = [];
   gs.trickHistory = [];
   gs.log = `ダイヤの3を持つ ${gs.players[starter].name} から開始`;
@@ -708,7 +710,7 @@ function createGameState(playersMeta, rules) {
     currentIndex: 0, field: null, fieldOwner: null,
     lockSuits: null, lockSeq: null, prevTrack: null,
     passedThisField: new Set(),
-    revolutionCount: 0, tempReversed: false,
+    revolutionCount: 0, tempReversed: false, direction: 1,
     finishOrder: [], selected: [], log: '',
     pendingAction: null, pendingCount: 0, pendingActor: null, effectQueue: [], pendingAfterQueue: null,
     lastRoundPoints: 0, trickHistory: [], foulPenalty: null,
