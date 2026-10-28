@@ -487,7 +487,7 @@ function learnedPremiumAggression(){
 const I18N={
   ja:{
     brandKanji:'大富豪', brandEn:'Daifugo',
-    tabLocal:'友達と対戦', tabCpu:'CPUと対戦', tabPractice:'練習(ヒント付き)', opponentLabel:'対戦相手',
+    tabOnline:'オンライン対戦', onlineDesc:'世界中の人とマッチングして対戦します(別ページが開きます)', tabCpu:'CPUと対戦', tabPractice:'練習(ヒント付き)', opponentLabel:'対戦相手',
     modeDescLocal:'同じ画面を回して交代でプレーします',
     modeDescPractice:'CPU相手に、階段や革命の可能性・おすすめの一手を画面に表示しながらプレーします',
     modeDescCpu:'あなた1人 + CPUと対戦します',
@@ -584,7 +584,7 @@ const I18N={
   },
   en:{
     brandKanji:'大富豪', brandEn:'Daifugo',
-    tabLocal:'Play with Friends', tabCpu:'Play vs CPU', tabPractice:'Practice (with hints)', opponentLabel:'Opponent',
+    tabOnline:'Play Online', onlineDesc:'Get matched with players online (opens in a new page)', tabCpu:'Play vs CPU', tabPractice:'Practice (with hints)', opponentLabel:'Opponent',
     modeDescLocal:'Pass the same screen around and take turns.',
     modeDescPractice:'Play against CPUs with on-screen hints for straights, Revolution chances, and recommended moves.',
     modeDescCpu:'You alone against the CPU players.',
@@ -694,7 +694,7 @@ function t(key, ...args){
 
 const state={
   lang:loadLang(),
-  screen:'setup', mode:'local', playerCount:4, names:['プレイヤー1','プレイヤー2','プレイヤー3','プレイヤー4','プレイヤー5'],
+  screen:'setup', mode:'cpu', playerCount:4, names:['','プレイヤー2','プレイヤー3','プレイヤー4','プレイヤー5'],
   players:[], currentIndex:0, pendingIndex:0, continuedTurn:false,
   field:null, fieldOwner:null,
   lockSuits:null, lockSeq:null, prevTrack:null,
@@ -1905,6 +1905,7 @@ function pileCluster(entry, idx, activeIdx){
   return wrap;
 }
 
+const ONLINE_MATCH_URL='https://daifugo-online-ppbb.onrender.com/';
 function renderSetup(root){
   const wrap=el('div',{class:'setup-wrap'}); const card=el('div',{class:'setup-card'});
   card.appendChild(buildLangSwitch());
@@ -1917,18 +1918,17 @@ function renderSetup(root){
   const sec0=el('div',{class:'setup-section'});
   sec0.appendChild(el('div',{class:'setup-label',text:t('opponentLabel')}));
   const modeRow=el('div',{class:'count-row'});
-  modeRow.appendChild(el('button',{class:'count-btn'+(state.mode==='local'?' active':''),text:t('tabLocal'),onclick:()=>{state.mode='local';render();}}));
+  modeRow.appendChild(el('button',{class:'count-btn',text:t('tabOnline'),onclick:()=>{ window.location.href=ONLINE_MATCH_URL; }}));
   modeRow.appendChild(el('button',{class:'count-btn'+(state.mode==='cpu'?' active':''),text:t('tabCpu'),onclick:()=>{state.mode='cpu';render();}}));
   modeRow.appendChild(el('button',{class:'count-btn'+(state.mode==='practice'?' active':''),text:t('tabPractice'),onclick:()=>{state.mode='practice';render();}}));
   sec0.appendChild(modeRow);
-  const modeDesc = state.mode==='local' ? t('modeDescLocal')
-    : state.mode==='practice' ? t('modeDescPractice')
+  const modeDesc = state.mode==='practice' ? t('modeDescPractice')
     : t('modeDescCpu');
   sec0.appendChild(el('div',{class:'setup-label',text:modeDesc, style:'margin-top:8px;'}));
   card.appendChild(sec0);
 
   const sec1=el('div',{class:'setup-section'});
-  sec1.appendChild(el('div',{class:'setup-label',text: state.mode==='local' ? t('playerCountLabel') : t('playerCountLabelCpu')}));
+  sec1.appendChild(el('div',{class:'setup-label',text:t('playerCountLabelCpu')}));
   const row=el('div',{class:'count-row'});
   for(let n=2;n<=5;n++) row.appendChild(el('button',{class:'count-btn'+(state.playerCount===n?' active':''),text:n+t('playerCountSuffix'),onclick:()=>{state.playerCount=n;render();}}));
   sec1.appendChild(row); card.appendChild(sec1);
@@ -1966,13 +1966,13 @@ function renderSetup(root){
   card.appendChild(secR);
 
   const sec2=el('div',{class:'setup-section'});
-  sec2.appendChild(el('div',{class:'setup-label',text: state.mode==='local' ? t('nameLabel') : t('nameLabelCpu')}));
+  sec2.appendChild(el('div',{class:'setup-label',text:t('nameLabelCpu')}));
   const list=el('div',{class:'name-list'});
-  const nameCount = state.mode==='local' ? state.playerCount : 1;
+  const nameCount = 1;
   for(let i=0;i<nameCount;i++){
     const rowEl=el('div',{class:'name-row'});
     rowEl.appendChild(el('div',{class:'name-badge',text:i+1}));
-    const input=el('input',{type:'text',placeholder: state.mode==='local' ? t('namePlaceholderPlayer',i+1) : t('namePlaceholderYou'),value:state.names[i]||''});
+    const input=el('input',{type:'text',placeholder:t('namePlaceholderYou'),value:state.names[i]||''});
     input.addEventListener('input',e=>{state.names[i]=e.target.value;});
     rowEl.appendChild(input); list.appendChild(rowEl);
   }
