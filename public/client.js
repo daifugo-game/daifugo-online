@@ -12,7 +12,7 @@ const I18N = {
     lobbyTitle:'マッチング', online:'接続中', offline:'切断', leaveRoom:'退出する', confirmLeave:'退出しますか?途中経過は失われます。',
     loading:'読み込み中…',
     roundTitle:(n)=>`大富豪 - ラウンド${n}`,
-    revolutionBadge:(n,mult)=>`革命×${n}(pt${mult}倍)`, tempReversedBadge:'一時反転中', reverseBadge:'逆回り',
+    revolutionBadge:(n,mult)=>`革命×${n}(pt${mult}倍)`, tempReversedBadge:'一時反転中', reverseBadge:'逆回り', dirCw:'時計回り', dirCcw:'逆回り', dirToastCw:'時計回りに戻った!', dirToastCcw:'逆回りに変わった!', nextChip:'次',
     gekiBadge:(suits,rank)=>`激縛り:${suits}${rank}かJOKER`, lockBadge:suits=>`縛り:${suits}のみ`,
     fieldEmpty:'場は空です — 好きな組み合わせで出せます',
     gekiBanner:(suits,rank,count)=>`🔒 激縛り中:次は ${suits}${rank}${count>1?`(${count}枚組)`:''} か JOKER しか出せません`,
@@ -78,7 +78,7 @@ const I18N = {
     lobbyTitle:'Matchmaking', online:'Online', offline:'Offline', leaveRoom:'Leave', confirmLeave:'Leave? Your progress will be lost.',
     loading:'Loading…',
     roundTitle:(n)=>`Daifugo - Round ${n}`,
-    revolutionBadge:(n,mult)=>`Revolution×${n} (${mult}× points)`, tempReversedBadge:'Temporarily Reversed', reverseBadge:'Reverse order',
+    revolutionBadge:(n,mult)=>`Revolution×${n} (${mult}× points)`, tempReversedBadge:'Temporarily Reversed', reverseBadge:'Reverse order', dirCw:'Clockwise', dirCcw:'Counter-clockwise', dirToastCw:'Back to clockwise!', dirToastCcw:'Direction reversed!', nextChip:'NEXT',
     gekiBadge:(suits,rank)=>`Strong Lock: ${suits}${rank} or JOKER`, lockBadge:suits=>`Suit Lock: ${suits} only`,
     fieldEmpty:'The table is empty — play any combination to lead',
     gekiBanner:(suits,rank,count)=>`🔒 Strong Suit Lock: only ${suits}${rank}${count>1?` (×${count})`:''} or JOKER can be played`,
@@ -432,9 +432,16 @@ function rankLabels(n){
   labels.push(L.hinmin,L.daihinmin);
   return labels;
 }
-function seatSlotForIndex(idx,n){
-  if(n<=4) return ['tl','tr','br','bl'][idx];
-  return ['tl','tc','tr','bl','br'][idx];
+// 自分を一番下として、時計回り(画面上で 下→左→上→右)に席を並べる。インデックスが増える向き=時計回り。
+function seatSlotForIndex(idx,n,me){
+  const rel=((idx-me)%n+n)%n;
+  const ring={2:['tc'],3:['tl','tr'],4:['bl','tc','br'],5:['bl','tl','tr','br']}[n]||['tc'];
+  return ring[rel-1];
+}
+function nextPlayerIndex(players,cur,dir){
+  const n=players.length; let j=cur;
+  for(let k=0;k<n;k++){ j=((j+(dir===-1?-1:1))%n+n)%n; if(!players[j].finished) return j; }
+  return cur;
 }
 function buildLangSwitch(cls){
   const row = el('div',{class:cls||'lang-switch'});
@@ -466,6 +473,20 @@ function renderLanding(root){
   wrap.appendChild(card); root.appendChild(wrap);
 }
 
+const DIR_CSS = `
+/* turn direction guide */
+.dir-ring{position:absolute;left:50%;top:50%;width:200px;height:200px;margin:-100px 0 0 -100px;border-radius:50%;border:2px dashed rgba(214,178,94,.3);pointer-events:none;z-index:0;display:flex;align-items:center;justify-content:center;animation:dirspin 24s linear infinite;}
+.dir-ring.ccw{animation-direction:reverse;}
+.dir-ring .dir-glyph{font-size:4.6rem;line-height:1;color:rgba(214,178,94,.16);animation:dirspin 24s linear infinite reverse;}
+.dir-ring.ccw .dir-glyph{animation-direction:normal;}
+@keyframes dirspin{to{transform:rotate(360deg);}}
+.dir-label{position:absolute;left:50%;top:50%;transform:translate(-50%,112px);pointer-events:none;z-index:0;font-size:.68rem;letter-spacing:.06em;color:rgba(214,178,94,.75);white-space:nowrap;}
+.dir-label.rev{color:#ffd86b;font-weight:700;}
+.next-chip{margin-top:2px;font-size:.6rem;font-weight:800;letter-spacing:.08em;padding:1px 7px;border-radius:999px;background:var(--gold-soft,#d6b25e);color:#1b2a20;}
+.seat.next{border-color:rgba(214,178,94,.7);}
+.dir-toast{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);z-index:40;pointer-events:none;padding:10px 18px;border-radius:999px;background:rgba(0,0,0,.72);border:1px solid var(--gold-soft,#d6b25e);color:#ffd86b;font-weight:800;font-size:1rem;white-space:nowrap;animation:dirtoast 1.8s ease-out forwards;}
+@keyframes dirtoast{0%{opacity:0;transform:translate(-50%,-50%) scale(.8);}12%{opacity:1;transform:translate(-50%,-50%) scale(1.05);}75%{opacity:1;}100%{opacity:0;}}
+`;
 /*RULE_META_START*/
 const RULE_META = [
   {"id":"revolution","kana":"カクメイ","ja":"革命","en":"Revolution","jaDesc":"同じ数字を4枚以上(階段4枚以上も)出すと、カードの強さが逆転する。もう一度出すと元に戻る。","enDesc":"Play 4+ cards at once (or a 4+ run) and the card order flips. Do it again to flip back.","group":"core"},
@@ -555,7 +576,7 @@ const RULE_CSS = `
 /*RULE_PANEL_END*/
 
 /* ---------- render: lobby ---------- */
-(function(){ try{ const st=document.createElement('style'); st.textContent=RULE_CSS+'.match-status{text-align:center;margin:14px 0;} .match-title{font-weight:700;color:var(--gold-soft);} .match-count{font-size:1.6rem;font-weight:800;margin:6px 0;} .match-sub{font-size:.75rem;color:var(--muted);}'; document.head.appendChild(st);}catch(e){} })();
+(function(){ try{ const st=document.createElement('style'); st.textContent=DIR_CSS+RULE_CSS+'.match-status{text-align:center;margin:14px 0;} .match-title{font-weight:700;color:var(--gold-soft);} .match-count{font-size:1.6rem;font-weight:800;margin:6px 0;} .match-sub{font-size:.75rem;color:var(--muted);}'; document.head.appendChild(st);}catch(e){} })();
 function renderLobby(root){
   const wrap = el('div',{class:'landing-wrap'});
   const card = el('div',{class:'landing-card'});
@@ -600,7 +621,7 @@ function renderGame(root){
   topbar.appendChild(el('div',{class:'title', text:t('roundTitle', st.roundNumber)}));
   const badges = el('div',{class:'badge-row'});
   if(st.revolutionCount>0) badges.appendChild(el('div',{class:'badge gold', text:t('revolutionBadge', st.revolutionCount, Math.pow(2,st.revolutionCount))}));
-  if(st.direction===-1) badges.appendChild(el('div',{class:'badge on', text:'↺ '+t('reverseBadge')}));
+  badges.appendChild(el('div',{class:'badge'+(st.direction===-1?' on':''), text:(st.direction===-1?'↺ ':'↻ ')+t(st.direction===-1?'dirCcw':'dirCw')}));
   if(st.tempReversed) badges.appendChild(el('div',{class:'badge on', text:t('tempReversedBadge')}));
   if(st.lockSeq) badges.appendChild(el('div',{class:'badge on', text:t('gekiBadge', st.lockSeq.suits.join(''), st.lockSeq.rank)}));
   else if(st.lockSuits) badges.appendChild(el('div',{class:'badge on', text:t('lockBadge', st.lockSuits.join(''))}));
@@ -609,10 +630,22 @@ function renderGame(root){
   root.appendChild(topbar);
 
   const arena = el('div',{class:'arena'});
+  { const rev = st.direction===-1;
+    arena.appendChild(el('div',{class:'dir-ring '+(rev?'ccw':'cw')},[el('span',{class:'dir-glyph',text:rev?'↺':'↻'})]));
+    arena.appendChild(el('div',{class:'dir-label'+(rev?' rev':''),text:(rev?'↺ ':'↻ ')+t(rev?'dirCcw':'dirCw')}));
+    const dkey = st.roundNumber+':'+(st.direction||1);
+    if(app.__dirKey && app.__dirKey.split(':')[0]===String(st.roundNumber) && app.__dirKey!==dkey) app.__dirToastAt = Date.now();
+    app.__dirKey = dkey;
+    if(app.__dirToastAt && Date.now()-app.__dirToastAt<1800){
+      const tt=el('div',{class:'dir-toast',text:(rev?'↺ ':'↻ ')+t(rev?'dirToastCcw':'dirToastCw')});
+      tt.style.animationDelay='-'+(Date.now()-app.__dirToastAt)+'ms'; arena.appendChild(tt);
+    }
+  }
+  const __nextIdx = nextPlayerIndex(st.players, st.currentIndex, st.direction);
   st.players.forEach((p,i)=>{
     if(i===myId) return;
-    const pos = seatSlotForIndex(i,n);
-    const cls = ['seat',pos]; if(p.finished) cls.push('done'); if(i===st.currentIndex && !p.finished) cls.push('current');
+    const pos = seatSlotForIndex(i,n,myId);
+    const cls = ['seat',pos]; if(p.finished) cls.push('done'); if(i===st.currentIndex && !p.finished) cls.push('current'); if(i===__nextIdx && i!==st.currentIndex && !p.finished) cls.push('next');
     const seat = el('div',{class:cls.join(' ')});
     const faceEl=el('div',{class:'face',text:p.name.slice(0,1)});
     faceEl.style.background=`linear-gradient(160deg,hsl(${[160,28,205,300,50][i%5]},45%,42%),hsl(${[160,28,205,300,50][i%5]},50%,26%))`;
@@ -628,12 +661,13 @@ function renderGame(root){
       seat.appendChild(miniHandFan(p.handCount));
     }
     seat.appendChild(el('div',{class:'sscore', text:p.score+'pt'}));
+    if(i===__nextIdx && i!==st.currentIndex && !p.finished) seat.appendChild(el('div',{class:'next-chip',text:t('nextChip')}));
     arena.appendChild(seat);
   });
 
   { const th=st.trickHistory||[], lastH=th[th.length-1], key=st.roundNumber+':'+th.length;
     if(lastH && lastH.kind==='play' && key!==app.__animKey && lastH.playerIndex!==undefined){
-      __enterDir = lastH.playerIndex===myId ? 'self' : seatSlotForIndex(lastH.playerIndex,n);
+      __enterDir = lastH.playerIndex===myId ? 'self' : seatSlotForIndex(lastH.playerIndex,n,myId);
     } else __enterDir=null;
     app.__animKey=key; }
   const fieldZone = el('div',{class:'field-zone'});
